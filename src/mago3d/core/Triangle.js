@@ -14,7 +14,7 @@ var Triangle= function()
 	this.vertex0;
 	this.vertex1;
 	this.vertex2;
-	this.normal;
+	this.normal; // plainNormal.
 };
 
 /**
@@ -22,10 +22,54 @@ var Triangle= function()
  */
 Triangle.prototype.destroy = function() 
 {
-	this.vertex0 = undefined;
-	this.vertex1 = undefined;
-	this.vertex2 = undefined;
-	this.normal = undefined;
+	// delete this.*************
+	if (this.vertex0)
+	{
+		this.vertex0.deleteObjects();
+		this.vertex0 = undefined;
+	}
+	if (this.vertex1)
+	{
+		this.vertex1.deleteObjects();
+		this.vertex1 = undefined;
+	}
+	if (this.vertex2)
+	{
+		this.vertex2.deleteObjects();
+		this.vertex2 = undefined;
+	}
+	if (this.normal)
+	{
+		this.normal.deleteObjects();
+		this.normal = undefined;
+	}
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+Triangle.prototype.deleteObjects = function() 
+{
+	if (this.vertex0)
+	{
+		this.vertex0.deleteObjects();
+		this.vertex0 = undefined;
+	}
+	if (this.vertex1)
+	{
+		this.vertex1.deleteObjects();
+		this.vertex1 = undefined;
+	}
+	if (this.vertex2)
+	{
+		this.vertex2.deleteObjects();
+		this.vertex2 = undefined;
+	}
+	if (this.normal)
+	{
+		this.normal.deleteObjects();
+		this.normal = undefined;
+	}
 };
 
 /**
@@ -39,6 +83,18 @@ Triangle.prototype.setVertices = function(vertex0, vertex1, vertex2)
 	this.vertex0 = vertex0;
 	this.vertex1 = vertex1;
 	this.vertex2 = vertex2;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+Triangle.prototype.invertSense = function() 
+{
+	var vertexAux = this.vertex1;
+	this.vertex1 = this.vertex2;
+	this.vertex2 = vertexAux;
+	
+	this.calculatePlaneNormal();
 };
 
 /**

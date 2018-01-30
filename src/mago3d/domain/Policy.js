@@ -17,13 +17,15 @@ var Policy = function()
 	// outfitting 표시 여부
 	this.showOutFitting = false;
 	// label 표시/비표시
-	this.showLabelInfo = true;
+	this.showLabelInfo = false;
 	// boundingBox 표시/비표시
 	this.showBoundingBox = false;
 	// 그림자 표시/비표시
 	this.showShadow = false;
-	// far frustum 거리
+	// squared far frustum 거리
 	this.frustumFarSquaredDistance = 5000000;
+	// far frustum
+	this.frustumFarDistance = 2300;
 
 	// highlighting
 	this.highLightedBuildings = [];
@@ -34,13 +36,15 @@ var Policy = function()
 	// show/hide
 	this.hideBuildings = [];
 	// move mode
-	this.mouseMoveMode = CODE.moveMode.NONE;
+	this.objectMoveMode = CODE.moveMode.NONE;
 	// 이슈 등록 표시
 	this.issueInsertEnable = false;
 	// object 정보 표시
 	this.objectInfoViewEnable = false;
 	// 이슈 목록 표시
 	this.nearGeoIssueListEnable = false;
+	// occlusion culling
+	this.occlusionCullingEnable = false;
 	
 	// 이미지 경로
 	this.imagePath = "";
@@ -49,19 +53,21 @@ var Policy = function()
 	this.colorChangedObjectId;
 	
 	// LOD1
-	this.lod0 = null;
-	this.lod1 = null;
-	this.lod2 = null;
-	this.lod3 = null;
+	this.lod0DistInMeters = 15;
+	this.lod1DistInMeters = 50;
+	this.lod2DistInMeters = 90;
+	this.lod3DistInMeters = 200;
+	this.lod4DistInMeters = 1000;
+	this.lod5DistInMeters = 50000;
 	
 	// Lighting
-	this.ambientReflectionCoef = null;
-	this.diffuseReflectionCoef = null;
-	this.specularReflectionCoef = null;
+	this.ambientReflectionCoef = 0.45; // 0.2.
+	this.diffuseReflectionCoef = 0.75; // 1.0
+	this.specularReflectionCoef = 0.6; // 0.7
 	this.ambientColor = null;
-	this.specularColor = null;
+	this.specularColor = new Float32Array([0.6, 0.6, 0.6]);
 	
-	this.ssaoRadius = null;
+	this.ssaoRadius = 0.15;
 };
 
 Policy.prototype.getMagoEnable = function() 
@@ -116,6 +122,15 @@ Policy.prototype.setFrustumFarSquaredDistance = function(frustumFarSquaredDistan
 	this.frustumFarSquaredDistance = frustumFarSquaredDistance;
 };
 
+Policy.prototype.getFrustumFarDistance = function() 
+{
+	return this.frustumFarDistance;
+};
+Policy.prototype.setFrustumFarDistance = function(frustumFarDistance) 
+{
+	this.frustumFarDistance = frustumFarDistance;
+};
+
 Policy.prototype.getHighLightedBuildings = function() 
 {
 	return this.highLightedBuildings;
@@ -152,13 +167,13 @@ Policy.prototype.setHideBuildings = function(hideBuildings)
 	this.hideBuildings = hideBuildings;
 };
 
-Policy.prototype.getMouseMoveMode = function() 
+Policy.prototype.getObjectMoveMode = function() 
 {
-	return this.mouseMoveMode;
+	return this.objectMoveMode;
 };
-Policy.prototype.setMouseMoveMode = function(mouseMoveMode) 
+Policy.prototype.setObjectMoveMode = function(objectMoveMode) 
 {
-	this.mouseMoveMode = mouseMoveMode;
+	this.objectMoveMode = objectMoveMode;
 };
 
 Policy.prototype.getIssueInsertEnable = function() 
@@ -176,6 +191,14 @@ Policy.prototype.getObjectInfoViewEnable = function()
 Policy.prototype.setObjectInfoViewEnable = function(objectInfoViewEnable) 
 {
 	this.objectInfoViewEnable = objectInfoViewEnable;
+};
+Policy.prototype.getOcclusionCullingEnable = function() 
+{
+	return this.occlusionCullingEnable;
+};
+Policy.prototype.setOcclusionCullingEnable = function(occlusionCullingEnable) 
+{
+	this.occlusionCullingEnable = occlusionCullingEnable;
 };
 Policy.prototype.getNearGeoIssueListEnable = function() 
 {
@@ -195,39 +218,54 @@ Policy.prototype.setImagePath = function(imagePath)
 	this.imagePath = imagePath;
 };
 
-Policy.prototype.getLod0 = function() 
+Policy.prototype.getLod0DistInMeters = function() 
 {
-	return this.lod0;
+	return this.lod0DistInMeters;
 };
-Policy.prototype.setLod0 = function(lod0) 
+Policy.prototype.setLod0DistInMeters = function(lod0DistInMeters) 
 {
-	this.lod0 = lod0;
+	this.lod0DistInMeters = lod0DistInMeters;
 };
-Policy.prototype.getLod1 = function() 
+Policy.prototype.getLod1DistInMeters = function() 
 {
-	return this.lod1;
+	return this.lod1DistInMeters;
 };
-Policy.prototype.setLod1 = function(lod1) 
+Policy.prototype.setLod1DistInMeters = function(lod1DistInMeters) 
 {
-	this.lod1 = lod1;
+	this.lod1DistInMeters = lod1DistInMeters;
 };
-Policy.prototype.getLod2 = function() 
+Policy.prototype.getLod2DistInMeters = function() 
 {
-	return this.lod2;
+	return this.lod2DistInMeters;
 };
-Policy.prototype.setLod2 = function(lod2) 
+Policy.prototype.setLod2DistInMeters = function(lod2DistInMeters) 
 {
-	this.lod2 = lod2;
+	this.lod2DistInMeters = lod2DistInMeters;
 };
-Policy.prototype.getLod3 = function() 
+Policy.prototype.getLod3DistInMeters = function() 
 {
-	return this.lod3;
+	return this.lod3DistInMeters;
 };
-Policy.prototype.setLod3 = function(lod3) 
+Policy.prototype.setLod3DistInMeters = function(lod3DistInMeters) 
 {
-	this.lod3 = lod3;
+	this.lod3DistInMeters = lod3DistInMeters;
 };
-
+Policy.prototype.getLod4DistInMeters = function() 
+{
+	return this.lod4DistInMeters;
+};
+Policy.prototype.setLod4DistInMeters = function(lod4DistInMeters) 
+{
+	this.lod4DistInMeters = lod4DistInMeters;
+};
+Policy.prototype.getLod5DistInMeters = function() 
+{
+	return this.lod5DistInMeters;
+};
+Policy.prototype.setLod5DistInMeters = function(lod5DistInMeters) 
+{
+	this.lod5DistInMeters = lod5DistInMeters;
+};
 Policy.prototype.getAmbientReflectionCoef = function() 
 {
 	return this.ambientReflectionCoef;

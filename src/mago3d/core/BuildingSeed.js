@@ -16,8 +16,29 @@ var BuildingSeed = function()
 	this.buildingFileName;
 	this.geographicCoord; // class : GeographicCoord.
 	this.rotationsDegree; // class : Point3D. (heading, pitch, roll).
-	this.bBox;
-	//this.created = false;
+	this.bBox;            // class : BoundingBox.
+	this.geographicCoordOfBBox; // class : GeographicCoord.
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+BuildingSeed.prototype.deleteObjects = function() 
+{
+	this.fisrtName = undefined;
+	this.name = undefined;
+	this.buildingId = undefined;
+	this.buildingFileName = undefined;
+	
+	this.geographicCoord.deleteObjects(); 
+	this.rotationsDegree.deleteObjects();
+	this.bBox.deleteObjects();           
+	this.geographicCoordOfBBox.deleteObjects(); 
+	
+	this.geographicCoord = undefined; 
+	this.rotationsDegree = undefined;
+	this.bBox = undefined;           
+	this.geographicCoordOfBBox = undefined; 
 };
 
 /**
@@ -34,7 +55,32 @@ var BuildingSeedList = function()
 	this.minGeographicCoord; // longitude, latitude, altitude.
 	this.maxGeographicCoord; // longitude, latitude, altitude.
 	
-	this.dataArrayBuffer;
+	this.dataArrayBuffer; // binary data.
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+BuildingSeedList.prototype.deleteObjects = function() 
+{
+	this.minGeographicCoord.deleteObjects(); 
+	this.maxGeographicCoord.deleteObjects(); 
+	
+	this.minGeographicCoord = undefined; 
+	this.maxGeographicCoord = undefined;
+	
+	if (this.buildingSeedArray)
+	{
+		var buildingSeedsCount = this.buildingSeedArray.length;
+		for (var i=0; i<buildingSeedsCount; i++)
+		{
+			this.buildingSeedArray[i].deleteObjects();
+			this.buildingSeedArray[i] = undefined;
+		}
+		this.buildingSeedArray = undefined;
+	}
+	
+	this.dataArrayBuffer = undefined;
 };
 
 /**
@@ -52,7 +98,7 @@ BuildingSeedList.prototype.newBuildingSeed = function()
  */
 BuildingSeedList.prototype.parseBuildingSeedArrayBuffer = function() 
 {
-	if (this.dataArrayBuffer == undefined)
+	if (this.dataArrayBuffer === undefined)
 	{ return false; }
 	
 	var arrayBuffer = this.dataArrayBuffer;
@@ -95,7 +141,6 @@ BuildingSeedList.prototype.parseBuildingSeedArrayBuffer = function()
 		buildingSeed.buildingId = buildingName.substr(4, buildingNameLength-4);
 		buildingSeed.buildingFileName = buildingName;
 		buildingSeed.geographicCoord.setLonLatAlt(longitude, latitude, altitude);
-		
 	}
 	
 	return true;

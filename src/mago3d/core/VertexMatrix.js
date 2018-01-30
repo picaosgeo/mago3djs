@@ -22,6 +22,20 @@ var VertexMatrix = function()
  * 어떤 일을 하고 있습니까?
  * @returns vertexList
  */
+VertexMatrix.prototype.deleteObjects = function() 
+{
+	for (var i = 0, vertexListsCount = this.vertexListsArray.length; i < vertexListsCount; i++) 
+	{
+		this.vertexListsArray[i].deleteObjects();
+		this.vertexListsArray[i] = undefined;
+	}
+	this.vertexListsArray = undefined;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @returns vertexList
+ */
 VertexMatrix.prototype.newVertexList = function() 
 {
 	var vertexList = new VertexList();
@@ -45,6 +59,8 @@ VertexMatrix.prototype.getVertexList = function(idx)
 		return undefined;
 	}
 };
+
+
 
 /**
  * 어떤 일을 하고 있습니까?

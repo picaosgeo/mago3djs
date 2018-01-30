@@ -17,6 +17,8 @@ var Lego = function()
 	this.fileLoadState = CODE.fileLoadState.READY;
 	this.dataArrayBuffer;
 	this.selColor4;
+	this.texture;
+	this.textureName;
 };
 
 /**
@@ -35,6 +37,21 @@ Lego.prototype.parseArrayBuffer = function(gl, dataArraybuffer, magoManager)
 /**
  * F4D Lego 자료를 읽는다
  * 
+ */
+Lego.prototype.isReadyToRender = function()
+{
+	if (this.fileLoadState !== CODE.fileLoadState.PARSE_FINISHED)
+	{ return false; }
+	
+	if (this.texture === undefined || this.texture.texId === undefined)
+	{ return false; }
+	
+	return true;
+};
+
+/**
+ * F4D Lego 자료를 읽는다
+ * 
  * @param {any} gl 
  * @param {any} readWriter 
  * @param {any} dataArraybuffer 
@@ -46,11 +63,18 @@ Lego.prototype.deleteObjects = function(gl, vboMemManager)
 	this.vbo_vicks_container = undefined;
 	this.fileLoadState = undefined;
 	this.dataArrayBuffer = undefined;
-	if (this.selColor4 != undefined)
+	if (this.selColor4 !== undefined)
 	{
 		this.selColor4.deleteObjects();
 		this.selColor4 = undefined;
 	}
+	
+	this.textureName = undefined;
+	if (this.texture)
+	{
+		this.texture.deleteObjects(gl);
+	}
+	this.texture = undefined;
 };
 
 /**

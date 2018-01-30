@@ -11,8 +11,10 @@ var FileRequestControler = function()
 		throw new Error(Messages.CONSTRUCT_ERROR);
 	}
 	
-	this.maxFilesRequestedCount = 6;
+	this.maxFilesRequestedCount = 1;
 	this.filesRequestedCount = 0;
+	this.headerFilesRequestedCount = 0;
+	this.modelRefFilesRequestedCount = 0;
 };
 
 FileRequestControler.prototype.isFull = function ()
@@ -20,7 +22,17 @@ FileRequestControler.prototype.isFull = function ()
 	return this.filesRequestedCount >= this.maxFilesRequestedCount; 
 };
 
+FileRequestControler.prototype.isFullHeaders = function ()
+{
+	return this.headerFilesRequestedCount >= 1; 
+};
+
 FileRequestControler.prototype.isFullPlus = function (extraCount)
 {
 	return this.filesRequestedCount >= (this.maxFilesRequestedCount + extraCount); 
+};
+
+FileRequestControler.prototype.isFullPlusModelReferences = function (extraCount)
+{
+	return this.modelRefFilesRequestedCount >= (this.maxFilesRequestedCount + extraCount); 
 };

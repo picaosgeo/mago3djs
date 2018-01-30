@@ -14,6 +14,7 @@ var Frustum = function()
 	this.near = new Float32Array([0.1]);
 	this.far = new Float32Array([1000.0]);
 	this.fovyRad = new Float32Array([0.8037]);
+	this.tangentOfHalfFovy = new Float32Array([0.0]);
 	this.fovRad = new Float32Array([1.047]);
 	this.aspectRatio = new Float32Array([1.3584]);
 	this.planesArray = [];
@@ -48,15 +49,6 @@ Frustum.prototype.intersectionSphere = function(sphere)
 	{ return Constant.INTERSECTION_INSIDE; }
 };
 
-/**
- * 포인트값 삭제
- * 어떤 일을 하고 있습니까?
- */
-Frustum.prototype.calculateFrustumPlanes = function(sphere) 
-{
-	// 1rst, calculate the center points of near and far.
-	// todo:
-};
 
 
 

@@ -24,11 +24,70 @@ var SmartTile = function(smartTileName)
 	this.maxGeographicCoord; // longitude, latitude, altitude.
 	this.sphereExtent; // cartesian position sphere in worldCoord.
 	this.subTiles; // array.
-	//this.startIdx; // todo.
-	//this.endIdx; // todo.
 	
-	this.buildingSeedsArray;
-	this.buildingsArray;
+	this.nodeSeedsArray;
+	this.nodesArray; // nodes with geometry data only (lowest nodes).
+	
+	this.isVisible; // var to manage the frustumCulling and delete buildings if necessary.
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+SmartTile.prototype.deleteObjects = function() 
+{
+	this.name = undefined;
+	this.depth = undefined;
+	if (this.minGeographicCoord)
+	{ this.minGeographicCoord.deleteObjects(); } 
+		
+	if (this.maxGeographicCoord)
+	{ this.maxGeographicCoord.deleteObjects(); } 
+	
+	this.minGeographicCoord = undefined; 
+	this.maxGeographicCoord = undefined; 
+	if (this.sphereExtent)
+	{ this.sphereExtent.deleteObjects(); }
+	
+	this.sphereExtent = undefined;
+	
+	// now, erase nodeSeeds.
+	if (this.nodeSeedsArray)
+	{
+		var nodeSeedsCount = this.nodeSeedsArray.length;
+		for (var i=0; i<nodeSeedsCount; i++)
+		{
+			// no delete the nodeObjects. nodeObjects must be deleted by hierarchyManager.
+			this.nodeSeedsArray[i] = undefined;
+		}
+		this.nodeSeedsArray = undefined;
+	}
+	
+	// now, erase nodes.
+	if (this.nodesArray)
+	{
+		var nodesCount = this.nodesArray.length;
+		for (var i=0; i<nodesCount; i++)
+		{
+			// no delete the nodeObjects. nodeObjects must be deleted by hierarchyManager.
+			this.nodesArray[i] = undefined;
+		}
+		this.nodesArray = undefined;
+	}
+	
+	this.isVisible = undefined;
+	
+	// delete children.
+	if (this.subTiles)
+	{
+		var subTilesCount = this.subTiles.length;
+		for (var i=0; i<subTilesCount; i++)
+		{
+			this.subTiles[i].deleteObjects();
+			this.subTiles[i] = undefined;
+		}
+		this.subTiles = undefined;
+	}
 };
 
 /**
@@ -36,7 +95,7 @@ var SmartTile = function(smartTileName)
  */
 SmartTile.prototype.newSubTile = function(parentTile) 
 {
-	if (this.subTiles == undefined)
+	if (this.subTiles === undefined)
 	{ this.subTiles = []; }
 	
 	var subTile = new SmartTile();
@@ -48,41 +107,62 @@ SmartTile.prototype.newSubTile = function(parentTile)
 /**
  * 어떤 일을 하고 있습니까?
  */
-SmartTile.prototype.getNeoBuildingById = function(buildingType, buildingId) 
+SmartTile.prototype.clearNodesArray = function() 
 {
-	var resultNeoBuilding;
+	if (this.nodesArray === undefined)
+	{ return; }
+	
+	for (var i=0; i<this.nodesArray.length; i++)
+	{
+		this.nodesArray[i] = undefined;
+	}
+	this.nodesArray = undefined;
+};
+
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+/*
+SmartTile.prototype.getNodeByBuildingId = function(buildingType, buildingId) 
+{
+	var resultNode;
+	var neoBuilding;
+	var node;
 	var hasSubTiles = true;
-	if (this.subTiles == undefined)
+	if (this.subTiles === undefined)
 	{ hasSubTiles = false; }
 	
-	if (this.subTiles && this.subTiles.length == 0)
+	if (this.subTiles && this.subTiles.length === 0)
 	{ hasSubTiles = false; }
 		
 	if (!hasSubTiles)
 	{
-		if (this.buildingsArray)
+		if (this.nodesArray)
 		{
-			var buildingCount = this.buildingsArray.length;
+			var nodesCount = this.nodesArray.length;
 			var find = false;
 			var i=0;
-			while (!find && i<buildingCount) 
+			while (!find && i<nodesCount) 
 			{
+				node = this.nodesArray[i];
+				neoBuilding = node.data.neoBuilding;
 				if (buildingType)
 				{
-					if (this.buildingsArray[i].buildingId === buildingId && this.buildingsArray[i].buildingType === buildingType) 
+					if (neoBuilding.buildingId === buildingId && neoBuilding.buildingType === buildingType) 
 					{
 						find = true;
-						resultNeoBuilding = this.buildingsArray[i];
-						return resultNeoBuilding;
+						resultNode = node;
+						return resultNode;
 					}
 				}
 				else 
 				{
-					if (this.buildingsArray[i].buildingId === buildingId) 
+					if (neoBuilding.buildingId === buildingId) 
 					{
 						find = true;
-						resultNeoBuilding = this.buildingsArray[i];
-						return resultNeoBuilding;
+						resultNode = node;
+						return resultNode;
 					}
 				}
 				i++;
@@ -93,14 +173,89 @@ SmartTile.prototype.getNeoBuildingById = function(buildingType, buildingId)
 	{
 		for (var i=0; i<this.subTiles.length; i++)
 		{
-			resultNeoBuilding = this.subTiles[i].getNeoBuildingById(buildingType, buildingId);
-			if (resultNeoBuilding)
-			{ return resultNeoBuilding; }
+			resultNode = this.subTiles[i].getNodeByBuildingId(buildingType, buildingId);
+			if (resultNode)
+			{ return resultNode; }
 		}
 	}
 	
+	return resultNode;
+};
+*/
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+SmartTile.prototype.getNeoBuildingById = function(buildingType, buildingId) 
+{
+	var resultNeoBuilding;
+	var node = this.getNodeByBuildingId(buildingType, buildingId);
+	if (node !== undefined)
+	{ resultNeoBuilding = node.data.neoBuilding; }
+
 	return resultNeoBuilding;
 };
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+SmartTile.prototype.getBuildingSeedById = function(buildingType, buildingId) 
+{
+	var resultNeoBuildingSeed;
+	var hasSubTiles = true;
+	if (this.subTiles === undefined)
+	{ hasSubTiles = false; }
+	
+	if (this.subTiles && this.subTiles.length === 0)
+	{ hasSubTiles = false; }
+		
+	if (!hasSubTiles)
+	{
+		if (this.nodeSeedsArray)
+		{
+			var buildingCount = this.nodeSeedsArray.length;
+			var find = false;
+			var i=0;
+			var buildingSeed, node;
+			while (!find && i<buildingCount) 
+			{
+				node = this.nodeSeedsArray[i];
+				buildingSeed = node.data.buildingSeed;
+				if (buildingType)
+				{
+					if (buildingSeed.buildingId === buildingId && buildingSeed.buildingType === buildingType) 
+					{
+						find = true;
+						resultNeoBuildingSeed = buildingSeed;
+						return resultNeoBuildingSeed;
+					}
+				}
+				else 
+				{
+					if (buildingSeed.buildingId === buildingId) 
+					{
+						find = true;
+						resultNeoBuildingSeed = buildingSeed;
+						return resultNeoBuildingSeed;
+					}
+				}
+				i++;
+			}
+		}	
+	}
+	else 
+	{
+		for (var i=0; i<this.subTiles.length; i++)
+		{
+			resultNeoBuildingSeed = this.subTiles[i].getBuildingSeedById(buildingType, buildingId);
+			if (resultNeoBuildingSeed)
+			{ return resultNeoBuildingSeed; }
+		}
+	}
+	
+	return resultNeoBuildingSeed;
+};
+
 
 /**
  * 어떤 일을 하고 있습니까?
@@ -108,53 +263,57 @@ SmartTile.prototype.getNeoBuildingById = function(buildingType, buildingId)
  */
 SmartTile.prototype.makeSphereExtent = function(magoManager) 
 {
-	if (this.sphereExtent == undefined)
+	if (this.sphereExtent === undefined)
 	{ this.sphereExtent = new Sphere(); }
 	
 	// calculate worldCoord center position.
 	var midLongitude = (this.maxGeographicCoord.longitude + this.minGeographicCoord.longitude)/2;
 	var midLatitude = (this.maxGeographicCoord.latitude + this.minGeographicCoord.latitude)/2;
 	var midAltitude = (this.maxGeographicCoord.altitude + this.minGeographicCoord.altitude)/2;
+	
 	this.sphereExtent.centerPoint = ManagerUtils.geographicCoordToWorldPoint(midLongitude, midLatitude, midAltitude, this.sphereExtent.centerPoint, magoManager);
 	
 	// calculate an aproximate radius.
-	var cornerPoint = ManagerUtils.geographicCoordToWorldPoint(this.minGeographicCoord.longitude, this.minGeographicCoord.latitude, this.minGeographicCoord.altitude, cornerPoint, magoManager);
-	this.sphereExtent.r = this.sphereExtent.centerPoint.distTo(cornerPoint.x, cornerPoint.y, cornerPoint.z) * 1.2;
+	var cornerPoint;
+	cornerPoint = ManagerUtils.geographicCoordToWorldPoint(this.minGeographicCoord.longitude, this.minGeographicCoord.latitude, this.minGeographicCoord.altitude, cornerPoint, magoManager);
+	this.sphereExtent.r = this.sphereExtent.centerPoint.distTo(cornerPoint.x, cornerPoint.y, cornerPoint.z) * 1.3;
 };
 
 /**
  * 어떤 일을 하고 있습니까?
  * @param geoLocData 변수
  */
-SmartTile.prototype.makeTree = function(minDegree, magoManager) 
+SmartTile.prototype.makeTreeByDepth = function(targetDepth, magoManager) 
 {
-	if (this.buildingSeedsArray == undefined || this.buildingSeedsArray.length == 0)
+	if (this.nodeSeedsArray === undefined || this.nodeSeedsArray.length === 0)
 	{ return; }
 	
-	// if this has "buildingSeedsArray" then make sphereExtent.
+	// if this has "nodeSeedsArray" then make sphereExtent.
 	this.makeSphereExtent(magoManager);
 	
-	// now, if the dimensions of the tile is bigger than "minDegree", then make subTiles.
-	var longitudeRangeDegree = this.getLongitudeRangeDegree();
-	if (longitudeRangeDegree > minDegree)
+	// now, if the current depth < targetDepth, then descend.
+	if (this.depth < targetDepth)
 	{
 		// create 4 child smartTiles.
-		for (var i=0; i<4; i++)
-		{ this.newSubTile(this); }
+		if (this.subTiles === undefined || this.subTiles.length === 0)
+		{
+			for (var i=0; i<4; i++)
+			{ this.newSubTile(this); }
+		}
 		
-		// set the sizes to subTiles.
+		// set the sizes to subTiles (The minLongitude, MaxLongitude, etc. is constant, but the minAlt & maxAlt can will be modified every time that insert new buildingSeeds).
 		this.setSizesToSubTiles();
-		
+
 		// intercept buildingSeeds for each subTiles.
 		for (var i=0; i<4; i++)
 		{
-			this.subTiles[i].takeIntersectedBuildingSeeds(this.buildingSeedsArray);
+			this.subTiles[i].takeIntersectedBuildingSeeds(this.nodeSeedsArray, magoManager);
 		}
 		
 		// for each subTile that has intercepted buildingSeeds -> makeTree.
 		for (var i=0; i<4; i++)
 		{
-			this.subTiles[i].makeTree(minDegree, magoManager);
+			this.subTiles[i].makeTreeByDepth(targetDepth, magoManager);
 		}
 		
 	}
@@ -164,26 +323,113 @@ SmartTile.prototype.makeTree = function(minDegree, magoManager)
  * 어떤 일을 하고 있습니까?
  * @param geoLocData 변수
  */
-SmartTile.prototype.takeIntersectedBuildingSeeds = function(buildingSeedsArray) 
+/*
+SmartTile.prototype.getLowestTileWithNodeInside = function(node) 
 {
+	// this function returns the lowestTile with "node" if exist.
+	if (this.subTiles === undefined)
+	{
+		var nodesCount = this.nodesArray.length;
+		var i=0;
+		while (i<nodesCount)
+		{
+			if (node == this.nodesArray[i])
+			{
+				return this;
+			}
+			i++;
+		}
+		return undefined;
+	}
+	else 
+	{	
+		var subTilesCount = this.subTiles.length;
+		var lowestTile;
+		for (var i=0; i<subTilesCount; i++)
+		{
+			lowestTile = this.subTiles[i].getLowestTileWithNodeInside(node);
+			if (lowestTile)
+			{ return lowestTile; }
+		}
+		
+		return undefined;
+	}
+};
+*/
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param geoLocData 변수
+ */
+SmartTile.prototype.takeIntersectedBuildingSeeds = function(nodeSeedsArray) 
+{
+	// this function intersects the buildingSeeds with this tile.
+	// this function is used only one time when load a initial buildings distributions on the globe.
 	var buildingSeed;
-	var buildingSeedsCount = buildingSeedsArray.length;
+	var node;
+	var buildingSeedsCount = nodeSeedsArray.length;
 	for (var i=0; i<buildingSeedsCount; i++)
 	{
-		buildingSeed = buildingSeedsArray[i];
-		if (this.intersectPoint(buildingSeed.geographicCoord.longitude, buildingSeed.geographicCoord.latitude))
+		node = nodeSeedsArray[i];
+		buildingSeed = node.data.buildingSeed;
+		
+		if (this.intersectPoint(buildingSeed.geographicCoordOfBBox.longitude, buildingSeed.geographicCoordOfBBox.latitude))
 		{
-			buildingSeedsArray.splice(i, 1);
+			nodeSeedsArray.splice(i, 1);
 			i--;
-			buildingSeedsCount = buildingSeedsArray.length;
+			buildingSeedsCount = nodeSeedsArray.length;
 			
-			if (this.buildingSeedsArray == undefined)
-			{ this.buildingSeedsArray = []; }
+			if (this.nodeSeedsArray === undefined)
+			{ this.nodeSeedsArray = []; }
 			
-			this.buildingSeedsArray.push(buildingSeed);
+			this.nodeSeedsArray.push(node);
+			
+			// now, redefine the altitude limits of this tile.
+			var altitude = buildingSeed.geographicCoordOfBBox.altitude;
+			var bboxRadius = buildingSeed.bBox.getRadiusAprox();
+			if (altitude-bboxRadius < this.minGeographicCoord.altitude)
+			{
+				this.minGeographicCoord.altitude = altitude-bboxRadius;
+			}
+			if (altitude+bboxRadius > this.maxGeographicCoord.altitude)
+			{
+				this.maxGeographicCoord.altitude = altitude+bboxRadius;
+			}
 		}
 	}
 };
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param geoLocData 변수
+ */
+/*
+SmartTile.prototype.calculateAltitudeLimits = function() 
+{
+	// this function calculates the minAltitude and maxAltitude of the tile.
+	// init the altitudes.
+	this.minGeographicCoord.altitude = 0;
+	this.maxGeographicCoord.altitude = 0;
+	
+	var buildingSeed;
+	var buildingSeedsCount = this.buildingSeedsArray.length;
+	for (var i=0; i<buildingSeedsCount; i++)
+	{
+		buildingSeed = this.buildingSeedsArray[i];
+
+		var altitude = buildingSeed.geographicCoordOfBBox.altitude;
+		var bboxRadius = buildingSeed.bBox.getRadiusAprox();
+		if (altitude-bboxRadius < this.minGeographicCoord.altitude)
+		{
+			this.minGeographicCoord.altitude = altitude-bboxRadius;
+		}
+		if (altitude+bboxRadius > this.maxGeographicCoord.altitude)
+		{
+			this.maxGeographicCoord.altitude = altitude+bboxRadius;
+		}
+	}
+};
+*/
 
 /**
  * 어떤 일을 하고 있습니까?
@@ -206,9 +452,9 @@ SmartTile.prototype.intersectPoint = function(longitude, latitude)
  */
 SmartTile.prototype.extractLowestTiles = function(resultLowestTilesArray) 
 {
-	if (this.subTiles == undefined)
+	if (this.subTiles === undefined)
 	{
-		if (this.buildingSeedsArray && this.buildingSeedsArray.length > 0)
+		if (this.nodeSeedsArray && this.nodeSeedsArray.length > 0)
 		{
 			resultLowestTilesArray.push(this);
 		}
@@ -226,15 +472,15 @@ SmartTile.prototype.extractLowestTiles = function(resultLowestTilesArray)
  * 어떤 일을 하고 있습니까?
  * @param frustum 변수
  */
-SmartTile.prototype.getFrustumIntersectedLowestTiles = function(frustum, resultIntersectedTilesArray) 
+SmartTile.prototype.getFrustumIntersectedLowestTiles = function(frustum, resultFullyIntersectedTilesArray, resultPartiallyIntersectedTilesArray) 
 {
-	var intersectedTiles = [];
-	this.getFrustumIntersectedTiles(frustum, intersectedTiles);
+	var fullyIntersectedTiles = [];
+	this.getFrustumIntersectedTiles(frustum, fullyIntersectedTiles, resultPartiallyIntersectedTilesArray);
 	
-	var intersectedTilesCount = intersectedTiles.length;
+	var intersectedTilesCount = fullyIntersectedTiles.length;
 	for (var i=0; i<intersectedTilesCount; i++)
 	{
-		intersectedTiles[i].extractLowestTiles(resultIntersectedTilesArray);
+		fullyIntersectedTiles[i].extractLowestTiles(resultFullyIntersectedTilesArray);
 	}
 };
 
@@ -242,15 +488,18 @@ SmartTile.prototype.getFrustumIntersectedLowestTiles = function(frustum, resultI
  * 어떤 일을 하고 있습니까?
  * @param frustum 변수
  */
-SmartTile.prototype.getFrustumIntersectedTiles = function(frustum, resultIntersectedTilesArray) 
-{	
+SmartTile.prototype.getFrustumIntersectedTiles = function(frustum, resultFullyIntersectedTilesArray, resultPartiallyIntersectedTilesArray) 
+{
+	if (this.sphereExtent === undefined)
+	{ return Constant.INTERSECTION_OUTSIDE; }
+	
 	var intersectionType = frustum.intersectionSphere(this.sphereExtent);
 	
 	if (intersectionType === Constant.INTERSECTION_OUTSIDE)
 	{ return; }
 	else if (intersectionType === Constant.INTERSECTION_INSIDE)
 	{
-		resultIntersectedTilesArray.push(this);
+		resultFullyIntersectedTilesArray.push(this);
 		return;
 	}
 	else if (intersectionType === Constant.INTERSECTION_INTERSECT)
@@ -260,11 +509,14 @@ SmartTile.prototype.getFrustumIntersectedTiles = function(frustum, resultInterse
 			for (var i=0; i<this.subTiles.length; i++)
 			{
 				if (this.subTiles[i].sphereExtent)
-				{ this.subTiles[i].getFrustumIntersectedTiles(frustum, resultIntersectedTilesArray); }
+				{ this.subTiles[i].getFrustumIntersectedTiles(frustum, resultFullyIntersectedTilesArray, resultPartiallyIntersectedTilesArray); }
 			}
 		}
 		else
-		{ resultIntersectedTilesArray.push(this); }
+		{ 
+			if (this.nodeSeedsArray &&  this.nodeSeedsArray.length > 0)
+			{ resultPartiallyIntersectedTilesArray.push(this); } 
+		}
 	}
 };
 
@@ -283,9 +535,9 @@ SmartTile.prototype.getSphereExtent = function()
  */
 SmartTile.prototype.setSize = function(minLon, minLat, minAlt, maxLon, maxLat, maxAlt) 
 {
-	if (this.minGeographicCoord == undefined)
+	if (this.minGeographicCoord === undefined)
 	{ this.minGeographicCoord = new GeographicCoord(); }
-	if (this.maxGeographicCoord == undefined)	
+	if (this.maxGeographicCoord === undefined)	
 	{ this.maxGeographicCoord = new GeographicCoord(); }
 		
 	this.minGeographicCoord.setLonLatAlt(minLon, minLat, minAlt);	
@@ -344,67 +596,6 @@ SmartTile.prototype.getLatitudeRangeDegree = function()
 	return this.maxGeographicCoord.latitude - this.minGeographicCoord.latitude;
 };
 
-/**
- * 어떤 일을 하고 있습니까?
- * @param geoLocData 변수
- */
-SmartTile.prototype.calculateTileRange = function() 
-{
-	// No used function.
-	if (this.buildingSeedsArray == undefined)
-	{ return; }
-	
-	if (this.minGeographicCoord == undefined)
-	{ this.minGeographicCoord = new GeographicCoord(); }
-	if (this.maxGeographicCoord == undefined)	
-	{ this.maxGeographicCoord = new GeographicCoord(); }
-	
-	var buildingSeed;
-	var longitude, latitude, altitude;
-	var buildingSeedsCount = this.buildingSeedsArray.length;
-	for (var i=0; i<buildingSeedsCount; i++)
-	{
-		buildingSeed = this.buildingSeedsArray[i];
-		longitude = buildingSeed.geographicCoord.longitude;
-		latitude = buildingSeed.geographicCoord.latitude;
-		altitude = buildingSeed.geographicCoord.altitude;
-		
-		if (i == 0)
-		{
-			this.minGeographicCoord.setLonLatAlt(longitude, latitude, altitude);
-			this.maxGeographicCoord.setLonLatAlt(longitude, latitude, altitude);
-		}
-		else 
-		{
-			if (longitude < this.minGeographicCoord.longitude)
-			{ this.minGeographicCoord.longitude = longitude; }
-			
-			if (latitude < this.minGeographicCoord.latitude)
-			{ this.minGeographicCoord.latitude = latitude; }
-			
-			if (altitude < this.minGeographicCoord.altitude)
-			{ this.minGeographicCoord.altitude = altitude; }
-			
-			if (longitude > this.maxGeographicCoord.longitude)
-			{ this.maxGeographicCoord.longitude = longitude; }
-			
-			if (latitude > this.maxGeographicCoord.latitude)
-			{ this.maxGeographicCoord.latitude = latitude; }
-			
-			if (altitude > this.maxGeographicCoord.altitude)
-			{ this.maxGeographicCoord.altitude = altitude; }
-		}
-	}
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param geoLocData 변수
- */
-SmartTile.prototype.deleteBuildings = function(gl, vboMemManager) 
-{
-	
-};
 
 /**
  * Quadtree based tile with thickness.
@@ -417,25 +608,36 @@ var SmartTileManager = function()
 		throw new Error(Messages.CONSTRUCT_ERROR);
 	}
 	
-	this.tilesArray = []; // has 2 tiles.
+	this.tilesArray = []; // has 2 tiles (Asia side and America side).
+	this.createMainTiles();
+};
 
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class GeoLocationData
+ * @param geoLocData 변수
+ */
+SmartTileManager.prototype.createMainTiles = function() 
+{
 	// tile 1 : longitude {-180, 0}, latitude {-90, 90}
 	// tile 2 : longitude {0, 180},  latitude {-90, 90}
 	
+	// America side.
 	var tile1 = this.newSmartTile("AmericaSide");
-	if (tile1.minGeographicCoord == undefined)
+	if (tile1.minGeographicCoord === undefined)
 	{ tile1.minGeographicCoord = new GeographicCoord(); }
-	if (tile1.maxGeographicCoord == undefined)
+	if (tile1.maxGeographicCoord === undefined)
 	{ tile1.maxGeographicCoord = new GeographicCoord(); }
 	
 	tile1.depth = 0; // mother tile.
 	tile1.minGeographicCoord.setLonLatAlt(-180, -90, 0);
 	tile1.maxGeographicCoord.setLonLatAlt(0, 90, 0);
 	
+	// Asia side.
 	var tile2 = this.newSmartTile("AsiaSide");
-	if (tile2.minGeographicCoord == undefined)
+	if (tile2.minGeographicCoord === undefined)
 	{ tile2.minGeographicCoord = new GeographicCoord(); }
-	if (tile2.maxGeographicCoord == undefined)
+	if (tile2.maxGeographicCoord === undefined)
 	{ tile2.maxGeographicCoord = new GeographicCoord(); }
 	
 	tile2.depth = 0; // mother tile.
@@ -448,8 +650,44 @@ var SmartTileManager = function()
  * @class GeoLocationData
  * @param geoLocData 변수
  */
+SmartTileManager.prototype.deleteTiles = function() 
+{
+	// this function deletes all children tiles.
+	if (this.tilesArray)
+	{
+		var tilesCount = this.tilesArray.length; // allways tilesCount = 2. (Asia & America sides).
+		for (var i=0; i<tilesCount; i++)
+		{
+			this.tilesArray[i].deleteObjects();
+			this.tilesArray[i] = undefined;
+		}
+		this.tilesArray.length = 0;
+	}
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class GeoLocationData
+ * @param geoLocData 변수
+ */
+SmartTileManager.prototype.resetTiles = function() 
+{
+	this.deleteTiles();
+	
+	// now create the main tiles.
+	this.createMainTiles();
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class GeoLocationData
+ * @param geoLocData 변수
+ */
 SmartTileManager.prototype.newSmartTile = function(smartTileName) 
 {
+	if (this.tilesArray === undefined)
+	{ this.tilesArray = []; }
+	
 	var smartTile = new SmartTile(smartTileName);
 	this.tilesArray.push(smartTile);
 	return smartTile;
@@ -463,9 +701,26 @@ SmartTileManager.prototype.getNeoBuildingById = function(buildingType, buildingI
 	var resultNeoBuilding;
 	var i = 0;
 	var smartTilesCount = this.tilesArray.length;
-	while (resultNeoBuilding == undefined && i<smartTilesCount)
+	while (resultNeoBuilding === undefined && i<smartTilesCount)
 	{
-		resultNeoBuilding = this.tilesArray[i].getNeoBuildingById(buildingType, buildingId);
+		resultNeoBuilding = this.tilesArray[i].getNeoBuildingById(buildingType, buildingId); 
+		i++;
+	}
+	
+	return resultNeoBuilding;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+SmartTileManager.prototype.getBuildingSeedById = function(buildingType, buildingId) 
+{
+	var resultNeoBuilding;
+	var i = 0;
+	var smartTilesCount = this.tilesArray.length;
+	while (resultNeoBuilding === undefined && i<smartTilesCount)
+	{
+		resultNeoBuilding = this.tilesArray[i].getBuildingSeedById(buildingType, buildingId);
 		i++;
 	}
 	

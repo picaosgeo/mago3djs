@@ -13,9 +13,7 @@ var ReaderWriter = function()
 
 	//this.geometryDataPath = "/F4D_GeometryData";
 	this.geometryDataPath = MagoConfig.getPolicy().geo_data_path;
-	this.viArraysContainer = new VertexIdxVBOArraysContainer();
-	this.byteColorsVBOArraysContainer = new ByteColorsVBOArraysContainer();
-	//var simpleBuildingImage = new Image();
+	this.geometrySubDataPath;
 
 	this.j_counter;
 	this.k_counter;
@@ -50,6 +48,26 @@ var ReaderWriter = function()
 	this.zSC;
 	this.point3dSC = new Point3D();
 	this.bboxSC = new BoundingBox();
+};
+
+/**
+ * 버퍼에서 데이터를 읽어서 32비트 부호없는 정수값에 대한 배열의 0번째 값을 돌려줌
+ */
+ReaderWriter.prototype.getCurrentDataPath = function() 
+{
+	var currentDataPath;
+	
+	if (this.geometrySubDataPath !== undefined && this.geometrySubDataPath !== "")
+	{
+		currentDataPath = this.geometryDataPath + "/" + this.geometrySubDataPath;
+	}
+	else
+		
+	{
+		currentDataPath = this.geometryDataPath;
+	}
+	
+	return currentDataPath;
 };
 
 /**
@@ -261,7 +279,7 @@ ReaderWriter.prototype.getBoundingBoxFromFloat32Array = function(float32Array, r
 
 ReaderWriter.prototype.getNeoBlocksArraybuffer = function(fileName, lowestOctree, magoManager) 
 {
-	magoManager.fileRequestControler.filesRequestedCount += 1;
+	magoManager.fileRequestControler.modelRefFilesRequestedCount += 1;
 	var blocksList = lowestOctree.neoReferencesMotherAndIndices.blocksList;
 	blocksList.fileLoadState = CODE.fileLoadState.LOADING_STARTED;
 	
@@ -273,7 +291,7 @@ ReaderWriter.prototype.getNeoBlocksArraybuffer = function(fileName, lowestOctree
 			blocksList.dataArraybuffer = arrayBuffer;
 			blocksList.fileLoadState = CODE.fileLoadState.LOADING_FINISHED;
 			arrayBuffer = null;
-			magoManager.parseQueue.octreesLod0ModelsToParseArray.push(lowestOctree);
+			magoManager.parseQueue.putOctreeLod0ModelsToParse(lowestOctree);
 		}
 		else 
 		{
@@ -286,8 +304,8 @@ ReaderWriter.prototype.getNeoBlocksArraybuffer = function(fileName, lowestOctree
 		else { blocksList.fileLoadState = status; }
 	}).always(function() 
 	{
-		magoManager.fileRequestControler.filesRequestedCount -= 1;
-		if (magoManager.fileRequestControler.filesRequestedCount < 0) { magoManager.fileRequestControler.filesRequestedCount = 0; }
+		magoManager.fileRequestControler.modelRefFilesRequestedCount -= 1;
+		if (magoManager.fileRequestControler.modelRefFilesRequestedCount < 0) { magoManager.fileRequestControler.modelRefFilesRequestedCount = 0; }
 	});
 };
 
@@ -337,7 +355,7 @@ ReaderWriter.prototype.getNeoBlocks = function(gl, fileName, blocksList, readerW
  */
 ReaderWriter.prototype.getNeoReferencesArraybuffer = function(fileName, lowestOctree, magoManager) 
 {
-	magoManager.fileRequestControler.filesRequestedCount += 1;
+	magoManager.fileRequestControler.modelRefFilesRequestedCount += 1;
 	lowestOctree.neoReferencesMotherAndIndices.fileLoadState = CODE.fileLoadState.LOADING_STARTED;
 	
 	loadWithXhr(fileName).done(function(response) 
@@ -350,7 +368,7 @@ ReaderWriter.prototype.getNeoReferencesArraybuffer = function(fileName, lowestOc
 			{
 				neoRefsList.dataArraybuffer = arrayBuffer;
 				neoRefsList.fileLoadState = CODE.fileLoadState.LOADING_FINISHED;
-				magoManager.parseQueue.octreesLod0ReferencesToParseArray.push(lowestOctree);
+				magoManager.parseQueue.putOctreeLod0ReferencesToParse(lowestOctree);
 			}
 			arrayBuffer = null;
 			
@@ -366,8 +384,8 @@ ReaderWriter.prototype.getNeoReferencesArraybuffer = function(fileName, lowestOc
 		else { lowestOctree.neoReferencesMotherAndIndices.fileLoadState = status; }
 	}).always(function() 
 	{
-		magoManager.fileRequestControler.filesRequestedCount -= 1;
-		if (magoManager.fileRequestControler.filesRequestedCount < 0) { magoManager.fileRequestControler.filesRequestedCount = 0; }
+		magoManager.fileRequestControler.modelRefFilesRequestedCount -= 1;
+		if (magoManager.fileRequestControler.modelRefFilesRequestedCount < 0) { magoManager.fileRequestControler.modelRefFilesRequestedCount = 0; }
 	});
 };
 
@@ -391,7 +409,8 @@ ReaderWriter.prototype.getOctreeLegoArraybuffer = function(fileName, lowestOctre
 			{
 				lowestOctree.lego.dataArrayBuffer = arrayBuffer;
 				lowestOctree.lego.fileLoadState = CODE.fileLoadState.LOADING_FINISHED;
-				magoManager.parseQueue.octreesLod2LegosToParseArray.push(lowestOctree);
+				//magoManager.parseQueue.octreesLod2LegosToParseArray.push(lowestOctree);
+				magoManager.parseQueue.putOctreeLod2LegosToParse(lowestOctree);
 			}
 			else 
 			{
@@ -408,6 +427,46 @@ ReaderWriter.prototype.getOctreeLegoArraybuffer = function(fileName, lowestOctre
 		console.log("xhr status = " + status);
 		if (status === 0) { lowestOctree.lego.fileLoadState = 500; }
 		else { lowestOctree.lego.fileLoadState = status; }
+	}).always(function() 
+	{
+		magoManager.fileRequestControler.filesRequestedCount -= 1;
+		if (magoManager.fileRequestControler.filesRequestedCount < 0) { magoManager.fileRequestControler.filesRequestedCount = 0; }
+	});
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param gl 변수
+ * @param fileName 파일명
+ * @param magoManager 변수
+ */
+ReaderWriter.prototype.getLegoArraybuffer = function(fileName, legoMesh, magoManager) 
+{
+	magoManager.fileRequestControler.filesRequestedCount += 1;
+	legoMesh.fileLoadState = CODE.fileLoadState.LOADING_STARTED;
+	
+	loadWithXhr(fileName).done(function(response) 
+	{
+		var arrayBuffer = response;
+		if (arrayBuffer) 
+		{
+			if (legoMesh)
+			{
+				legoMesh.dataArrayBuffer = arrayBuffer;
+				legoMesh.fileLoadState = CODE.fileLoadState.LOADING_FINISHED;
+				magoManager.parseQueue.putSkinLegosToParse(legoMesh);
+			}
+			arrayBuffer = null;
+		}
+		else 
+		{
+			legoMesh.fileLoadState = 500;
+		}
+	}).fail(function(status) 
+	{
+		console.log("xhr status = " + status);
+		if (status === 0) { legoMesh.fileLoadState = 500; }
+		else { legoMesh.fileLoadState = status; }
 	}).always(function() 
 	{
 		magoManager.fileRequestControler.filesRequestedCount -= 1;
@@ -740,7 +799,7 @@ ReaderWriter.prototype.getPCloudHeader = function(gl, fileName, pCloud, readerWr
  * @param readerWriter 파일 처리를 담당
  * @param neoBuildingsList object index 파일을 파싱한 정보를 저장할 배열
  */
-ReaderWriter.prototype.getObjectIndexFileForSmartTile = function(fileName, magoManager, buildingSeedList) 
+ReaderWriter.prototype.getObjectIndexFileForSmartTile = function(fileName, magoManager, buildingSeedList, projectId) 
 {
 	loadWithXhr(fileName).done(function(response) 
 	{
@@ -750,13 +809,13 @@ ReaderWriter.prototype.getObjectIndexFileForSmartTile = function(fileName, magoM
 			buildingSeedList.dataArrayBuffer = arrayBuffer;
 			buildingSeedList.parseBuildingSeedArrayBuffer();
 			
-			magoManager.makeSmartTile(buildingSeedList);
+			magoManager.makeSmartTile(buildingSeedList, projectId);
 			arrayBuffer = null;
-			//magoManager.createDeploymentGeoLocationsForHeavyIndustries();
+			//MagoConfig.setObjectIndex("append", );
 		}
 		else 
 		{
-			//			blocksList.fileLoadState = 500;
+			// blocksList.fileLoadState = 500;
 		}
 	}).fail(function(status) 
 	{
@@ -931,7 +990,7 @@ ReaderWriter.prototype.getNeoHeader = function(gl, fileName, neoBuilding, reader
 ReaderWriter.prototype.getNeoHeaderAsimetricVersion = function(gl, fileName, neoBuilding, readerWriter, magoManager) 
 {
 	//BR_Project._f4d_header_readed = true;
-	magoManager.fileRequestControler.filesRequestedCount += 1;
+	magoManager.fileRequestControler.headerFilesRequestedCount += 1;
 	neoBuilding.metaData.fileLoadState = CODE.fileLoadState.LOADING_STARTED;
 
 	loadWithXhr(fileName).done(function(response) 
@@ -939,6 +998,9 @@ ReaderWriter.prototype.getNeoHeaderAsimetricVersion = function(gl, fileName, neo
 		var arrayBuffer = response;
 		if (arrayBuffer) 
 		{
+			//if(neoBuilding.buildingId === "historypark_del")
+			//var hola = 0;
+		
 			if (neoBuilding.metaData === undefined) 
 			{
 				neoBuilding.metaData = new MetaData();
@@ -949,7 +1011,7 @@ ReaderWriter.prototype.getNeoHeaderAsimetricVersion = function(gl, fileName, neo
 			if (neoBuilding.octree === undefined) { neoBuilding.octree = new Octree(undefined); }
 
 			// now, parse octreeAsimetric.***
-			neoBuilding.octree.parseAsimetricVersion(arrayBuffer, readerWriter, bytesReaded, neoBuilding);
+			bytesReaded = neoBuilding.octree.parseAsimetricVersion(arrayBuffer, readerWriter, bytesReaded, neoBuilding);
 
 			neoBuilding.metaData.oct_min_x = neoBuilding.octree.centerPos.x - neoBuilding.octree.half_dx;
 			neoBuilding.metaData.oct_max_x = neoBuilding.octree.centerPos.x + neoBuilding.octree.half_dx;
@@ -957,6 +1019,47 @@ ReaderWriter.prototype.getNeoHeaderAsimetricVersion = function(gl, fileName, neo
 			neoBuilding.metaData.oct_max_y = neoBuilding.octree.centerPos.y + neoBuilding.octree.half_dy;
 			neoBuilding.metaData.oct_min_z = neoBuilding.octree.centerPos.z - neoBuilding.octree.half_dz;
 			neoBuilding.metaData.oct_max_z = neoBuilding.octree.centerPos.z + neoBuilding.octree.half_dz;
+			
+			// now parse materialsList of the neoBuilding.
+			var ver0 = neoBuilding.metaData.version[0];
+			var ver1 = neoBuilding.metaData.version[2];
+			var ver2 = neoBuilding.metaData.version[4];
+			
+			if (ver0 === '0' && ver1 === '0' && ver2 === '1')
+			{
+				// read materials list.
+				var materialsCount = readerWriter.readInt32(arrayBuffer, bytesReaded, bytesReaded+4); bytesReaded += 4;
+				for (var i=0; i<materialsCount; i++)
+				{
+					var textureTypeName = "";
+					var textureImageFileName = "";
+
+					// Now, read the texture_type and texture_file_name.***
+					var texture_type_nameLegth = readerWriter.readUInt32(arrayBuffer, bytesReaded, bytesReaded+4); bytesReaded += 4;
+					for (var j=0; j<texture_type_nameLegth; j++) 
+					{
+						textureTypeName += String.fromCharCode(new Int8Array(arrayBuffer.slice(bytesReaded, bytesReaded+ 1)));bytesReaded += 1; // for example "diffuse".***
+					}
+
+					var texture_fileName_Legth = readerWriter.readUInt32(arrayBuffer, bytesReaded, bytesReaded+4); bytesReaded += 4;
+					for (var j=0; j<texture_fileName_Legth; j++) 
+					{
+						textureImageFileName += String.fromCharCode(new Int8Array(arrayBuffer.slice(bytesReaded, bytesReaded+ 1)));bytesReaded += 1;
+					}
+					
+					if (texture_fileName_Legth > 0)
+					{
+						var texture = new Texture();
+						texture.textureTypeName = textureTypeName;
+						texture.textureImageFileName = textureImageFileName;
+						
+						if (neoBuilding.texturesLoaded === undefined)
+						{ neoBuilding.texturesLoaded = []; }
+						
+						neoBuilding.texturesLoaded.push(texture);
+					}
+				}
+			}
 
 			neoBuilding.metaData.fileLoadState = CODE.fileLoadState.LOADING_FINISHED;
 
@@ -975,8 +1078,8 @@ ReaderWriter.prototype.getNeoHeaderAsimetricVersion = function(gl, fileName, neo
 		else { neoBuilding.metaData.fileLoadState = status; }
 	}).always(function() 
 	{
-		magoManager.fileRequestControler.filesRequestedCount -= 1;
-		if (magoManager.fileRequestControler.filesRequestedCount < 0) { magoManager.fileRequestControler.filesRequestedCount = 0; }
+		magoManager.fileRequestControler.headerFilesRequestedCount -= 1;
+		if (magoManager.fileRequestControler.headerFilesRequestedCount < 0) { magoManager.fileRequestControler.headerFilesRequestedCount = 0; }
 	});
 };
 
@@ -1188,7 +1291,7 @@ ReaderWriter.prototype.readNeoReferenceTexture = function(gl, filePath_inServer,
 	
 	if (extension === "tga" || extension === "TGA" || extension === "Tga")
 	{
-		//texture.fileLoadState = CODE.fileLoadState.LOADING_STARTED;
+		texture.fileLoadState = CODE.fileLoadState.LOADING_STARTED;
 		loadWithXhr(filePath_inServer).done(function(response) 
 		{
 			var arrayBuffer = response;
@@ -1284,6 +1387,7 @@ ReaderWriter.prototype.readNeoReferenceTexture = function(gl, filePath_inServer,
 					gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 					gl.generateMipmap(gl.TEXTURE_2D);
 					texture.fileLoadState = CODE.fileLoadState.LOADING_FINISHED; // file load finished.***
+					gl.bindTexture(gl.TEXTURE_2D, null);
 				}
 			}
 		}).fail(function(status) 
@@ -1304,9 +1408,17 @@ ReaderWriter.prototype.readNeoReferenceTexture = function(gl, filePath_inServer,
 	{
 		var neoRefImage = new Image();
 		texture.fileLoadState = CODE.fileLoadState.LOADING_STARTED; // file load started.***
+		
 		//magoManager.backGround_fileReadings_count ++;
 		neoRefImage.onload = function() 
 		{
+			// is possible that during loading image the building was deleted. Then return.
+			if (texture.texId === undefined)
+			{
+				return;
+			}
+			
+			// if "texture.texId" exist then bind it.
 			handleTextureLoaded(gl, neoRefImage, texture.texId);
 			texture.fileLoadState = CODE.fileLoadState.LOADING_FINISHED; // file load finished.***
 

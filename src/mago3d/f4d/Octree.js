@@ -22,7 +22,7 @@ var Octree = function(octreeOwner)
 	this.octree_owner;
 	this.octree_level = 0;
 	this.octree_number_name = 0;
-	this.squareDistToEye = 10000.0;
+	this.distToCamera;
 	this.triPolyhedronsCount = 0; // no calculated. Readed when parsing.***
 	this.fileLoadState = CODE.fileLoadState.READY;
 
@@ -34,13 +34,10 @@ var Octree = function(octreeOwner)
 
 	this.subOctrees_array = [];
 	this.neoReferencesMotherAndIndices; // Asimetric mode.***
+	this.lowestOctrees_array; // pre extract lowestOctrees for speedUp, if this is motherOctree.***
 
 	// now, for legoStructure.***
 	this.lego;
-	
-	// aditional data for web world wind, provisionally.******************
-	this.provisionalSegmentsArray;
-	// end provisional data.----------------------------------------------
 };
 
 /**
@@ -59,7 +56,41 @@ Octree.prototype.new_subOctree = function()
  * 어떤 일을 하고 있습니까?
  * @param treeDepth 변수
  */
-Octree.prototype.deleteGlObjects = function(gl, vboMemManager) 
+Octree.prototype.deleteObjectsModelReferences = function(gl, vboMemManager) 
+{
+	if (this.neoReferencesMotherAndIndices)
+	{ this.neoReferencesMotherAndIndices.deleteObjects(gl, vboMemManager); }
+
+	this.neoReferencesMotherAndIndices = undefined;
+
+	// delete the blocksList.***
+	if (this.neoRefsList_Array !== undefined) 
+	{
+		for (var i=0, neoRefListsCount = this.neoRefsList_Array.length; i<neoRefListsCount; i++) 
+		{
+			if (this.neoRefsList_Array[i]) 
+			{
+				this.neoRefsList_Array[i].deleteObjects(gl, vboMemManager);
+			}
+			this.neoRefsList_Array[i] = undefined;
+		}
+		this.neoRefsList_Array = undefined;
+	}
+
+	if (this.subOctrees_array !== undefined) 
+	{
+		for (var i=0, subOctreesCount = this.subOctrees_array.length; i<subOctreesCount; i++) 
+		{
+			this.subOctrees_array[i].deleteObjectsModelReferences(gl, vboMemManager);
+		}
+	}
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param treeDepth 변수
+ */
+Octree.prototype.deleteObjects = function(gl, vboMemManager) 
 {
 	if (this.lego !== undefined) 
 	{
@@ -68,7 +99,8 @@ Octree.prototype.deleteGlObjects = function(gl, vboMemManager)
 	}
 	
 	this.legoDataArrayBuffer = undefined;
-	this.centerPos.deleteObjects();
+	if (this.centerPos)
+	{ this.centerPos.deleteObjects(); }
 	this.centerPos = undefined;
 	this.half_dx = undefined; // half width.***
 	this.half_dy = undefined; // half length.***
@@ -77,7 +109,7 @@ Octree.prototype.deleteGlObjects = function(gl, vboMemManager)
 	this.octree_owner = undefined;
 	this.octree_level = undefined;
 	this.octree_number_name = undefined;
-	this.squareDistToEye = undefined;
+	this.distToCamera = undefined;
 	this.triPolyhedronsCount = undefined; // no calculated. Readed when parsing.***
 	this.fileLoadState = undefined; // 0 = no started to load. 1 = started loading. 2 = finished loading. 3 = parse started. 4 = parse finished.***
 
@@ -95,7 +127,7 @@ Octree.prototype.deleteGlObjects = function(gl, vboMemManager)
 		{
 			if (this.neoRefsList_Array[i]) 
 			{
-				this.neoRefsList_Array[i].deleteGlObjects(gl, vboMemManager);
+				this.neoRefsList_Array[i].deleteObjects(gl, vboMemManager);
 			}
 			this.neoRefsList_Array[i] = undefined;
 		}
@@ -106,7 +138,7 @@ Octree.prototype.deleteGlObjects = function(gl, vboMemManager)
 	{
 		for (var i=0, subOctreesCount = this.subOctrees_array.length; i<subOctreesCount; i++) 
 		{
-			this.subOctrees_array[i].deleteGlObjects(gl, vboMemManager);
+			this.subOctrees_array[i].deleteObjects(gl, vboMemManager);
 			this.subOctrees_array[i] = undefined;
 		}
 		this.subOctrees_array = undefined;
@@ -135,10 +167,32 @@ Octree.prototype.deleteLod0GlObjects = function(gl, vboMemManager)
  * 어떤 일을 하고 있습니까?
  * @param treeDepth 변수
  */
+Octree.prototype.deleteLod2GlObjects = function(gl, vboMemManager) 
+{
+	if (this.lego !== undefined) 
+	{
+		this.lego.deleteObjects(gl, vboMemManager);
+		this.lego = undefined;
+	}
+	
+	if (this.neoReferencesMotherAndIndices)
+	{ this.neoReferencesMotherAndIndices.deleteObjects(gl, vboMemManager); }
+
+	if (this.subOctrees_array !== undefined) 
+	{
+		for (var i=0, subOctreesCount = this.subOctrees_array.length; i<subOctreesCount; i++) 
+		{
+			this.subOctrees_array[i].deleteLod2GlObjects(gl, vboMemManager);
+		}
+	}
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param treeDepth 변수
+ */
 Octree.prototype.setRenderedFalseToAllReferences = function() 
 {
-
-
 	if (this.neoReferencesMotherAndIndices)
 	{
 		this.neoReferencesMotherAndIndices.setRenderedFalseToAllReferences();
@@ -148,8 +202,6 @@ Octree.prototype.setRenderedFalseToAllReferences = function()
 			this.subOctrees_array[i].setRenderedFalseToAllReferences();
 		}
 	}
-
-
 };
 
 /**
@@ -333,8 +385,7 @@ Octree.prototype.getCenterPos = function()
  */
 Octree.prototype.getRadiusAprox = function() 
 {
-	//return Math.abs(this.half_dx*1.2);
-	return Math.abs(this.half_dx*3.0);
+	return this.half_dx*1.7;
 };
 
 /**
@@ -390,45 +441,6 @@ Octree.prototype.getNeoRefListArray = function(result_NeoRefListsArray)
 /**
  * 어떤 일을 하고 있습니까?
  * @param cesium_cullingVolume 변수
- * @param result_CRefListsArray 변수
- * @param cesium_boundingSphere_scratch 변수
- * @param eye_x 변수
- * @param eye_y 변수
- * @param eye_z 변수
- */
-Octree.prototype.getFrustumVisibleCRefListArray = function(cesium_cullingVolume, result_CRefListsArray, cesium_boundingSphere_scratch, eye_x, eye_y, eye_z) 
-{
-	var visibleOctreesArray = [];
-	var sortedOctreesArray = [];
-	var distAux = 0.0;
-
-	//this.getAllSubOctrees(visibleOctreesArray); // Test.***
-	this.getFrustumVisibleOctrees(cesium_cullingVolume, visibleOctreesArray, cesium_boundingSphere_scratch);
-
-	// Now, we must sort the subOctrees near->far from eye.***
-	var visibleOctrees_count = visibleOctreesArray.length;
-	for (var i=0; i<visibleOctrees_count; i++) 
-	{
-		visibleOctreesArray[i].setSquareDistToEye(eye_x, eye_y, eye_z);
-		this.putOctreeInEyeDistanceSortedArray(sortedOctreesArray, visibleOctreesArray[i], eye_x, eye_y, eye_z);
-	}
-
-	for (var i=0; i<visibleOctrees_count; i++) 
-	{
-		sortedOctreesArray[i].getCRefListArray(result_CRefListsArray);
-		//visibleOctreesArray[i].getCRefListArray(result_CRefListsArray);
-	}
-
-	visibleOctreesArray.length = 0;
-	excludedOctArray.length = 0;
-
-	visibleOctreesArray = undefined;
-	excludedOctArray = undefined;
-};
-
-/**
- * 어떤 일을 하고 있습니까?
- * @param cesium_cullingVolume 변수
  * @param result_NeoRefListsArray 변수
  * @param cesium_boundingSphere_scratch 변수
  * @param eye_x 변수
@@ -448,8 +460,8 @@ Octree.prototype.getFrustumVisibleNeoRefListArray = function(cesium_cullingVolum
 	var visibleOctrees_count = visibleOctreesArray.length;
 	for (var i=0; i<visibleOctrees_count; i++) 
 	{
-		visibleOctreesArray[i].setSquareDistToEye(eye_x, eye_y, eye_z);
-		this.putOctreeInEyeDistanceSortedArray(sortedOctreesArray, visibleOctreesArray[i], eye_x, eye_y, eye_z);
+		visibleOctreesArray[i].setDistToCamera(cameraPosition);
+		this.putOctreeInEyeDistanceSortedArray(sortedOctreesArray, visibleOctreesArray[i]);
 	}
 
 	for (var i=0; i<visibleOctrees_count; i++) 
@@ -471,7 +483,7 @@ Octree.prototype.getFrustumVisibleNeoRefListArray = function(cesium_cullingVolum
  * @param eye_z 변수
  */
 Octree.prototype.getBBoxIntersectedLowestOctreesByLOD = function(bbox, visibleObjControlerOctrees, globalVisibleObjControlerOctrees,
-	bbox_scratch, eye_x, eye_y, eye_z, squaredDistLod0, squaredDistLod1, squaredDistLod2 ) 
+	bbox_scratch, cameraPosition, squaredDistLod0, squaredDistLod1, squaredDistLod2 ) 
 {
 	var visibleOctreesArray = [];
 	var distAux = 0.0;
@@ -484,37 +496,37 @@ Octree.prototype.getBBoxIntersectedLowestOctreesByLOD = function(bbox, visibleOb
 	var visibleOctrees_count = visibleOctreesArray.length;
 	for (var i=0; i<visibleOctrees_count; i++) 
 	{
-		visibleOctreesArray[i].setSquareDistToEye(eye_x, eye_y, eye_z);
+		visibleOctreesArray[i].setDistToCamera(cameraPosition);
 	}
 
 	for (var i=0; i<visibleOctrees_count; i++) 
 	{
-		if (visibleOctreesArray[i].squareDistToEye < squaredDistLod0) 
+		if (visibleOctreesArray[i].distToCamera < squaredDistLod0) 
 		{
 			if (visibleOctreesArray[i].triPolyhedronsCount > 0) 
 			{
 				if (globalVisibleObjControlerOctrees)
-				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles0, visibleOctreesArray[i], eye_x, eye_y, eye_z); }
+				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles0, visibleOctreesArray[i]); }
 				visibleObjControlerOctrees.currentVisibles0.push(visibleOctreesArray[i]);
 				find = true;
 			}
 		}
-		else if (visibleOctreesArray[i].squareDistToEye < squaredDistLod1) 
+		else if (visibleOctreesArray[i].distToCamera < squaredDistLod1) 
 		{
 			if (visibleOctreesArray[i].triPolyhedronsCount > 0) 
 			{
 				if (globalVisibleObjControlerOctrees)
-				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles1, visibleOctreesArray[i], eye_x, eye_y, eye_z); }
+				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles1, visibleOctreesArray[i]); }
 				visibleObjControlerOctrees.currentVisibles1.push(visibleOctreesArray[i]);
 				find = true;
 			}
 		}
-		else if (visibleOctreesArray[i].squareDistToEye < squaredDistLod2) 
+		else if (visibleOctreesArray[i].distToCamera < squaredDistLod2) 
 		{
 			if (visibleOctreesArray[i].triPolyhedronsCount > 0) 
 			{
 				if (globalVisibleObjControlerOctrees)
-				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles2, visibleOctreesArray[i], eye_x, eye_y, eye_z); }
+				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles2, visibleOctreesArray[i]); }
 				visibleObjControlerOctrees.currentVisibles2.push(visibleOctreesArray[i]);
 				find = true;
 			}
@@ -524,7 +536,7 @@ Octree.prototype.getBBoxIntersectedLowestOctreesByLOD = function(bbox, visibleOb
 			if (visibleOctreesArray[i].triPolyhedronsCount > 0) 
 			{
 				if (globalVisibleObjControlerOctrees)
-				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles3, visibleOctreesArray[i], eye_x, eye_y, eye_z); }
+				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles3, visibleOctreesArray[i]); }
 				visibleObjControlerOctrees.currentVisibles3.push(visibleOctreesArray[i]);
 				find = true;
 			}
@@ -545,10 +557,9 @@ Octree.prototype.getBBoxIntersectedLowestOctreesByLOD = function(bbox, visibleOb
  * @param eye_z 변수
  */
 Octree.prototype.getFrustumVisibleLowestOctreesByLOD = function(cullingVolume, visibleObjControlerOctrees, globalVisibleObjControlerOctrees,
-	boundingSphere_scratch, eye_x, eye_y, eye_z, squaredDistLod0, squaredDistLod1, squaredDistLod2 ) 
+	boundingSphere_scratch, cameraPosition, squaredDistLod0, squaredDistLod1, squaredDistLod2) 
 {
 	var visibleOctreesArray = [];
-	var distAux = 0.0;
 	var find = false;
 
 	//this.getAllSubOctrees(visibleOctreesArray); // Test.***
@@ -558,37 +569,37 @@ Octree.prototype.getFrustumVisibleLowestOctreesByLOD = function(cullingVolume, v
 	var visibleOctrees_count = visibleOctreesArray.length;
 	for (var i=0; i<visibleOctrees_count; i++) 
 	{
-		visibleOctreesArray[i].setSquareDistToEye(eye_x, eye_y, eye_z);
+		visibleOctreesArray[i].setDistToCamera(cameraPosition);
 	}
 
 	for (var i=0; i<visibleOctrees_count; i++) 
 	{
-		if (visibleOctreesArray[i].squareDistToEye < squaredDistLod0) 
+		if (visibleOctreesArray[i].distToCamera < squaredDistLod0) 
 		{
 			if (visibleOctreesArray[i].triPolyhedronsCount > 0) 
 			{
 				if (globalVisibleObjControlerOctrees)
-				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles0, visibleOctreesArray[i], eye_x, eye_y, eye_z); }
+				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles0, visibleOctreesArray[i]); }
 				visibleObjControlerOctrees.currentVisibles0.push(visibleOctreesArray[i]);
 				find = true;
 			}
 		}
-		else if (visibleOctreesArray[i].squareDistToEye < squaredDistLod1) 
+		else if (visibleOctreesArray[i].distToCamera < squaredDistLod1) 
 		{
 			if (visibleOctreesArray[i].triPolyhedronsCount > 0) 
 			{
 				if (globalVisibleObjControlerOctrees)
-				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles1, visibleOctreesArray[i], eye_x, eye_y, eye_z); }
+				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles1, visibleOctreesArray[i]); }
 				visibleObjControlerOctrees.currentVisibles1.push(visibleOctreesArray[i]);
 				find = true;
 			}
 		}
-		else if (visibleOctreesArray[i].squareDistToEye < squaredDistLod2) 
+		else if (visibleOctreesArray[i].distToCamera < squaredDistLod2) 
 		{
 			if (visibleOctreesArray[i].triPolyhedronsCount > 0) 
 			{
 				if (globalVisibleObjControlerOctrees)
-				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles2, visibleOctreesArray[i], eye_x, eye_y, eye_z); }
+				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles2, visibleOctreesArray[i]); }
 				visibleObjControlerOctrees.currentVisibles2.push(visibleOctreesArray[i]);
 				find = true;
 			}
@@ -605,8 +616,144 @@ Octree.prototype.getFrustumVisibleLowestOctreesByLOD = function(cullingVolume, v
 		}
 	}
 
-	visibleOctreesArray = null;
+	visibleOctreesArray = undefined;
 	return find;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param x 변수
+ * @param y 변수
+ * @param z 변수
+ * @returns intersects
+ */
+Octree.prototype.intersectsWithPoint3D = function(x, y, z) 
+{
+	//this.centerPos = new Point3D();
+	//this.half_dx = 0.0; // half width.***
+	//this.half_dy = 0.0; // half length.***
+	//this.half_dz = 0.0; // half height.***
+	var minX = this.centerPos.x - this.half_dx;
+	var minY = this.centerPos.y - this.half_dz;
+	var minZ = this.centerPos.z - this.half_dz;
+	var maxX = this.centerPos.x + this.half_dx;
+	var maxY = this.centerPos.y + this.half_dz;
+	var maxZ = this.centerPos.z + this.half_dz;
+	
+	var intersects = false;
+	if (x> minX && x<maxX) 
+	{
+		if (y> minY && y<maxY) 
+		{
+			if (z> minZ && z<maxZ) 
+			{
+				intersects = true;
+			}
+		}
+	}
+	
+	return intersects;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param x 변수
+ * @param y 변수
+ * @param z 변수
+ * @returns intersectedSubBox
+ */
+Octree.prototype.getIntersectedSubBoxByPoint3D = function(x, y, z) 
+{
+	if (this.octree_owner === undefined) 
+	{
+		// This is the mother_cell.***
+		if (!this.intersectsWithPoint3D(x, y, z)) 
+		{
+			return false;
+		}
+	}
+	
+	var intersectedSubBox = undefined;
+	var subBoxes_count = this.subOctrees_array.length;
+	if (subBoxes_count > 0) 
+	{
+		var center_x = this.centerPos.x;
+		var center_y = this.centerPos.y;
+		var center_z = this.centerPos.z;
+		
+		var intersectedSubBox_aux = undefined;
+		var intersectedSubBox_idx;
+		if (x<center_x) 
+		{
+			// Here are the boxes number 0, 3, 4, 7.***
+			if (y<center_y) 
+			{
+				// Here are 0, 4.***
+				if (z<center_z) { intersectedSubBox_idx = 0; }
+				else { intersectedSubBox_idx = 4; }
+			}
+			else 
+			{
+				// Here are 3, 7.***
+				if (z<center_z) { intersectedSubBox_idx = 3; }
+				else { intersectedSubBox_idx = 7; }
+			}
+		}
+		else 
+		{
+			// Here are the boxes number 1, 2, 5, 6.***
+			if (y<center_y) 
+			{
+				// Here are 1, 5.***
+				if (z<center_z) { intersectedSubBox_idx = 1; }
+				else { intersectedSubBox_idx = 5; }
+			}
+			else 
+			{
+				// Here are 2, 6.***
+				if (z<center_z) { intersectedSubBox_idx = 2; }
+				else { intersectedSubBox_idx = 6; }
+			}
+		}
+		
+		intersectedSubBox_aux = this.subOctrees_array[intersectedSubBox_idx];
+		intersectedSubBox = intersectedSubBox_aux.getIntersectedSubBoxByPoint3D(x, y, z);
+		
+	}
+	else 
+	{
+		intersectedSubBox = this;
+	}
+	
+	return intersectedSubBox;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ */
+Octree.prototype.getMinDistToCamera = function(cameraPosition)
+{
+	// this function returns the minDistToCamera of the lowestOctrees.***
+	var minDistToCam = 1000000.0;
+	
+	if (this.lowestOctrees_array === undefined)
+	{
+		this.lowestOctrees_array = [];
+		this.extractLowestOctreesIfHasTriPolyhedrons(this.lowestOctrees_array);
+	}
+	
+	var distToCamera;
+	var lowestOctree;
+	var lowestOctreesCount = this.lowestOctrees_array.length;
+	for (var i=0; i<lowestOctreesCount; i++)
+	{
+		lowestOctree = this.lowestOctrees_array[i];
+		distToCamera = lowestOctree.centerPos.distToPoint(cameraPosition) - this.getRadiusAprox();
+		if (distToCamera < minDistToCam)
+		{ minDistToCam = distToCamera; }
+	}
+	
+	return minDistToCam;
 };
 
 /**
@@ -619,60 +766,66 @@ Octree.prototype.getFrustumVisibleLowestOctreesByLOD = function(cullingVolume, v
  * @param eye_z 변수
  */
 Octree.prototype.extractLowestOctreesByLOD = function(visibleObjControlerOctrees, globalVisibleObjControlerOctrees,
-	boundingSphere_scratch, eye_x, eye_y, eye_z, squaredDistLod0, squaredDistLod1, squaredDistLod2 ) 
+	boundingSphere_scratch, cameraPosition, squaredDistLod0, squaredDistLod1, squaredDistLod2 ) 
 {
-	var lowestOctreesArray = [];
 	var distAux = 0.0;
 	var find = false;
-
-	this.extractLowestOctreesIfHasTriPolyhedrons(lowestOctreesArray);
+	
+	var eye_x = cameraPosition.x;
+	var eye_y = cameraPosition.y;
+	var eye_z = cameraPosition.z;
+	if (this.lowestOctrees_array === undefined)
+	{
+		this.lowestOctrees_array = [];
+		this.extractLowestOctreesIfHasTriPolyhedrons(this.lowestOctrees_array);
+	}
 	
 	// Now, we must sort the subOctrees near->far from eye.***
-	var visibleOctrees_count = lowestOctreesArray.length;
+	var visibleOctrees_count = this.lowestOctrees_array.length;
 	for (var i=0; i<visibleOctrees_count; i++) 
 	{
-		lowestOctreesArray[i].setSquareDistToEye(eye_x, eye_y, eye_z);
+		this.lowestOctrees_array[i].setDistToCamera(cameraPosition);
 	}
 
 	for (var i=0; i<visibleOctrees_count; i++) 
 	{
-		if (lowestOctreesArray[i].squareDistToEye < squaredDistLod0) 
+		if (this.lowestOctrees_array[i].distToCamera < squaredDistLod0) 
 		{
-			if (lowestOctreesArray[i].triPolyhedronsCount > 0) 
+			if (this.lowestOctrees_array[i].triPolyhedronsCount > 0) 
 			{
 				if (globalVisibleObjControlerOctrees)
-				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles0, lowestOctreesArray[i], eye_x, eye_y, eye_z); }
-				visibleObjControlerOctrees.currentVisibles0.push(lowestOctreesArray[i]);
+				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles0, this.lowestOctrees_array[i]); }
+				visibleObjControlerOctrees.currentVisibles0.push(this.lowestOctrees_array[i]);
 				find = true;
 			}
 		}
-		else if (lowestOctreesArray[i].squareDistToEye < squaredDistLod1) 
+		else if (this.lowestOctrees_array[i].distToCamera < squaredDistLod1) 
 		{
-			if (lowestOctreesArray[i].triPolyhedronsCount > 0) 
+			if (this.lowestOctrees_array[i].triPolyhedronsCount > 0) 
 			{
 				if (globalVisibleObjControlerOctrees)
-				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles1, lowestOctreesArray[i], eye_x, eye_y, eye_z); }
-				visibleObjControlerOctrees.currentVisibles1.push(lowestOctreesArray[i]);
+				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles1, this.lowestOctrees_array[i]); }
+				visibleObjControlerOctrees.currentVisibles1.push(this.lowestOctrees_array[i]);
 				find = true;
 			}
 		}
-		else if (lowestOctreesArray[i].squareDistToEye < squaredDistLod2) 
+		else if (this.lowestOctrees_array[i].distToCamera < squaredDistLod2) 
 		{
-			if (lowestOctreesArray[i].triPolyhedronsCount > 0) 
+			if (this.lowestOctrees_array[i].triPolyhedronsCount > 0) 
 			{
 				if (globalVisibleObjControlerOctrees)
-				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles2, lowestOctreesArray[i], eye_x, eye_y, eye_z); }
-				visibleObjControlerOctrees.currentVisibles2.push(lowestOctreesArray[i]);
+				{ this.putOctreeInEyeDistanceSortedArray(globalVisibleObjControlerOctrees.currentVisibles2, this.lowestOctrees_array[i]); }
+				visibleObjControlerOctrees.currentVisibles2.push(this.lowestOctrees_array[i]);
 				find = true;
 			}
 		}
 		else 
 		{
-			if (lowestOctreesArray[i].triPolyhedronsCount > 0) 
+			if (this.lowestOctrees_array[i].triPolyhedronsCount > 0) 
 			{
 				if (globalVisibleObjControlerOctrees)
-				{ globalVisibleObjControlerOctrees.currentVisibles3.push(lowestOctreesArray[i]); }
-				visibleObjControlerOctrees.currentVisibles3.push(lowestOctreesArray[i]);
+				{ globalVisibleObjControlerOctrees.currentVisibles3.push(this.lowestOctrees_array[i]); }
+				visibleObjControlerOctrees.currentVisibles3.push(this.lowestOctrees_array[i]);
 				find = true;
 			}
 		}
@@ -881,11 +1034,12 @@ Octree.prototype.getFrustumVisibleOctrees = function(cesium_cullingVolume, resul
  * @param eye_y 변수
  * @param eye_z 변수
  */
-Octree.prototype.setSquareDistToEye = function(eye_x, eye_y, eye_z) 
+Octree.prototype.setDistToCamera = function(cameraPosition) 
 {
-	this.squareDistToEye = (this.centerPos.x - eye_x)*(this.centerPos.x - eye_x) +
-							(this.centerPos.y - eye_y)*(this.centerPos.y - eye_y) +
-							(this.centerPos.z - eye_z)*(this.centerPos.z - eye_z) ;
+	// distance to camera as a sphere.
+	var distToCamera = this.centerPos.distToPoint(cameraPosition) - this.getRadiusAprox();
+	this.distToCamera = distToCamera;
+	return distToCamera;
 };
 
 /**
@@ -894,47 +1048,78 @@ Octree.prototype.setSquareDistToEye = function(eye_x, eye_y, eye_z)
  * @param octree 변수
  * @returns result_idx
  */
-Octree.prototype.getIndexToInsertBySquaredDistToEye = function(octreesArray, octree) 
+Octree.prototype.getIndexToInsertBySquaredDistToEye = function(octreesArray, octree, startIdx, endIdx) 
 {
-	// lineal implementation. In the future use dicotomic search technique.***
-	var finished = false;
-	var octrees_count = octreesArray.length;
-	var i=0;
-	var result_idx = 0;
-
-	while (!finished && i<octrees_count) 
+	// this do a dicotomic search of idx in a ordered table.
+	// 1rst, check the range.
+	
+	var range = endIdx - startIdx;
+	if (range < 6)
 	{
-		if (octreesArray[i].squareDistToEye > octree.squareDistToEye) 
+		// in this case do a lineal search.
+		var finished = false;
+		var i = startIdx;
+		var idx;
+		var octreesCount = octreesArray.length;
+		while (!finished && i<=endIdx)
 		{
-			result_idx = i;
-			finished = true;
+			if (octree.distToCamera < octreesArray[i].distToCamera)
+			{
+				idx = i;
+				finished = true;
+			}
+			i++;
 		}
-		i++;
+		
+		if (finished)
+		{
+			return idx;
+		}
+		else 
+		{
+			return endIdx+1;
+		}
 	}
-	if (!finished) 
+	else 
 	{
-		result_idx = octrees_count;
+		// in this case do the dicotomic search.
+		var middleIdx = startIdx + Math.floor(range/2);
+		var newStartIdx;
+		var newEndIdx;
+		if (octreesArray[middleIdx].distToCamera > octree.distToCamera)
+		{
+			newStartIdx = startIdx;
+			newEndIdx = middleIdx;
+		}
+		else 
+		{
+			newStartIdx = middleIdx;
+			newEndIdx = endIdx;
+		}
+		return this.getIndexToInsertBySquaredDistToEye(octreesArray, octree, newStartIdx, newEndIdx);
 	}
-
-	return result_idx;
 };
 
 /**
  * 어떤 일을 하고 있습니까?
  * @param result_octreesArray 변수
  * @param octree 변수
- * @param eye_x 변수
- * @param eye_y 변수
- * @param eye_z 변수
  */
-Octree.prototype.putOctreeInEyeDistanceSortedArray = function(result_octreesArray, octree, eye_x, eye_y, eye_z) 
+Octree.prototype.putOctreeInEyeDistanceSortedArray = function(result_octreesArray, octree) 
 {
 	// sorting is from minDist to maxDist.***
-	// http://stackoverflow.com/questions/586182/how-to-insert-an-item-into-an-array-at-a-specific-index
+	if (result_octreesArray.length > 0)
+	{
+		var startIdx = 0;
+		var endIdx = result_octreesArray.length - 1;
+		var insert_idx= this.getIndexToInsertBySquaredDistToEye(result_octreesArray, octree, startIdx, endIdx);
 
-	var insert_idx= this.getIndexToInsertBySquaredDistToEye(result_octreesArray, octree);
-
-	result_octreesArray.splice(insert_idx, 0, octree);
+		result_octreesArray.splice(insert_idx, 0, octree);
+	}
+	else 
+	{
+		result_octreesArray.push(octree);
+	}
 };
 
 /**
@@ -988,7 +1173,7 @@ Octree.prototype.getAllSubOctrees = function(result_octreesArray)
  */
 Octree.prototype.extractLowestOctreesIfHasTriPolyhedrons = function(lowestOctreesArray) 
 {
-	if (this.subOctrees_array == undefined)
+	if (this.subOctrees_array === undefined)
 	{ return; }
 	
 	var subOctreesCount = this.subOctrees_array.length;

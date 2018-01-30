@@ -15,16 +15,23 @@ uniform float far;
 uniform float fov;
 uniform float aspectRatio;    
 uniform float screenWidth;    
-uniform float screenHeight;    
+uniform float screenHeight;   
+uniform float shininessValue; 
 uniform vec3 kernel[16];   
 uniform vec4 vColor4Aux;
 
 varying vec2 vTexCoord;   
 varying vec3 vLightWeighting;
 varying vec4 vcolor4;
+uniform vec3 specularColor;
+varying vec3 vertexPos;
 
 const int kernelSize = 16;  
-const float radius = 0.5;      
+uniform float radius;    
+
+uniform float ambientReflectionCoef;
+uniform float diffuseReflectionCoef;  
+uniform float specularReflectionCoef;  
 
 float unpackDepth(const in vec4 rgba_depth)
 {
@@ -68,6 +75,8 @@ void main()
         offset.xy /= offset.w;
         offset.xy = offset.xy * 0.5 + 0.5;        
         float sampleDepth = -sample.z/far;
+		if(sampleDepth > 0.49)
+			continue;
         float depthBufferValue = getDepth(offset.xy);				              
         float range_check = abs(linearDepth - depthBufferValue)+radius*0.998;
         if (range_check < radius*1.001 && depthBufferValue <= sampleDepth)
@@ -79,12 +88,25 @@ void main()
         
     occlusion = 1.0 - occlusion / float(kernelSize);
                                 
-    vec3 lightPos = vec3(10.0, 10.0, 10.0);
-    vec3 L = normalize(lightPos);
-    float DiffuseFactor = dot(normal2, L);
-    float NdotL = abs(DiffuseFactor);
-    vec3 diffuse = vec3(NdotL);
-    vec3 ambient = vec3(1.0);
+    vec3 lightPos = vec3(20.0, 60.0, 20.0);
+    vec3 L = normalize(lightPos - vertexPos);
+    float lambertian = max(dot(normal2, L), 0.0);
+    float specular = 0.0;
+    if(lambertian > 0.0)
+    {
+        vec3 R = reflect(-L, normal2);      // Reflected light vector
+        vec3 V = normalize(-vertexPos); // Vector to viewer
+        
+        // Compute the specular term
+        float specAngle = max(dot(R, V), 0.0);
+        specular = pow(specAngle, shininessValue);
+    }
+	
+	if(lambertian < 0.5)
+    {
+		lambertian = 0.5;
+	}
+
     vec4 textureColor;
     if(hasTexture)
     {
@@ -92,16 +114,20 @@ void main()
         {
             textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, 1.0 - vTexCoord.t));
         }
-        else
-        {
+        else{
             textureColor = texture2D(diffuseTex, vec2(vTexCoord.s, vTexCoord.t));
         }
+		
+        if(textureColor.w == 0.0)
+        {
+            discard;
+        }
     }
-    else
-    {
-        textureColor = vcolor4;
+    else{
+        textureColor = vColor4Aux;
     }
-    
-    gl_FragColor.rgb = vec3((textureColor.xyz)*vLightWeighting * occlusion); 
-    gl_FragColor.a = 1.0;   
+	
+	vec3 ambientColor = vec3(textureColor.x, textureColor.y, textureColor.z);
+
+    gl_FragColor = vec4((ambientReflectionCoef * ambientColor + diffuseReflectionCoef * lambertian * textureColor.xyz + specularReflectionCoef * specular * specularColor)*vLightWeighting * occlusion, 1.0); 
 }

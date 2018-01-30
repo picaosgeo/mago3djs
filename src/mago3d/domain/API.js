@@ -20,12 +20,10 @@ function API(apiName)
 
 	// api 이름
 	this.apiName = apiName;
+	
 	// project id
 	this.projectId = null;
-	// block id
-	this.blockId = null;
-	// blockIds
-	this.blockIds = null;
+	this.projectDataFolder = null;
 	// objectIds
 	this.objectIds = null;
 	// data_key
@@ -37,8 +35,6 @@ function API(apiName)
 	// drawType 이미지를 그리는 유형 0 : DB, 1 : 이슈등록
 	this.drawType = 0;
 
-	// fullship = 0, deploy = 1
-	this.renderMode = 0;
 	// 위도
 	this.latitude = 0;
 	// 경도
@@ -51,7 +47,11 @@ function API(apiName)
 	this.pitch = 0;
 	// roll
 	this.roll = 0;
+	// duration
+	this.duration = 0;
 
+	// 속성
+	this.property = null;
 	// 색깔
 	this.color = 0;
 	// structs = MSP, outfitting = MOP
@@ -67,21 +67,25 @@ function API(apiName)
 	// frustum culling 가시 거리(M단위)
 	this.frustumFarDistance = 0;
 	// move mode 
-	this.mouseMoveMode = CODE.moveMode.NONE;
+	this.objectMoveMode = CODE.moveMode.NONE;
 	// 이슈 등록 표시
 	this.issueInsertEnable = false;
 	// object 정보 표시
 	this.objectInfoViewEnable = false;
 	// 이슈 목록 표시
 	this.nearGeoIssueListEnable = false;
+	// occlusion culling
+	this.occlusionCullingEnable = false;
 	//
 	this.insertIssueState = 0;
 	
 	// LOD1
-	this.lod0 = null;
-	this.lod1 = null;
-	this.lod2 = null;
-	this.lod3 = null;
+	this.lod0DistInMeters = null;
+	this.lod1DistInMeters = null;
+	this.lod2DistInMeters = null;
+	this.lod3DistInMeters = null;
+	this.lod4DistInMeters = null;
+	this.lod5DistInMeters = null;
 	
 	// Lighting
 	this.ambientReflectionCoef = null;
@@ -91,6 +95,8 @@ function API(apiName)
 	this.specularColor = null;
 	
 	this.ssaoRadius = null;
+	//
+	this.FPVMode = false;
 };
 
 API.prototype.getMagoEnable = function() 
@@ -116,22 +122,13 @@ API.prototype.setProjectId = function(projectId)
 	this.projectId = projectId;
 };
 
-API.prototype.getBlockId = function() 
+API.prototype.getProjectDataFolder = function() 
 {
-	return this.blockId;
+	return this.projectDataFolder;
 };
-API.prototype.setBlockId = function(blockId) 
+API.prototype.setProjectDataFolder = function(projectDataFolder) 
 {
-	this.blockId = blockId;
-};
-
-API.prototype.getBlockIds = function() 
-{
-	return this.blockIds;
-};
-API.prototype.setBlockIds = function(blockIds) 
-{
-	this.blockIds = blockIds;
+	this.projectDataFolder = projectDataFolder;
 };
 
 API.prototype.getObjectIds = function() 
@@ -167,15 +164,6 @@ API.prototype.getDataKey = function()
 API.prototype.setDataKey = function(dataKey) 
 {
 	this.dataKey = dataKey;
-};
-
-API.prototype.getRenderMode = function() 
-{
-	return this.renderMode;
-};
-API.prototype.setRenderMode = function(renderMode) 
-{
-	this.renderMode = renderMode;
 };
 
 API.prototype.getLatitude = function() 
@@ -230,6 +218,15 @@ API.prototype.getRoll = function()
 API.prototype.setRoll = function(roll) 
 {
 	this.roll = roll;
+};
+
+API.prototype.getProperty = function() 
+{
+	return this.property;
+};
+API.prototype.setProperty = function(property) 
+{
+	this.property = property;
 };
 
 API.prototype.getColor = function() 
@@ -295,13 +292,13 @@ API.prototype.setFrustumFarDistance = function(frustumFarDistance)
 	this.frustumFarDistance = frustumFarDistance;
 };
 
-API.prototype.getMouseMoveMode = function() 
+API.prototype.getObjectMoveMode = function() 
 {
-	return this.mouseMoveMode;
+	return this.objectMoveMode;
 };
-API.prototype.setMouseMoveMode = function(mouseMoveMode) 
+API.prototype.setObjectMoveMode = function(objectMoveMode) 
 {
-	this.mouseMoveMode = mouseMoveMode;
+	this.objectMoveMode = objectMoveMode;
 };
 
 API.prototype.getIssueInsertEnable = function() 
@@ -319,6 +316,14 @@ API.prototype.getObjectInfoViewEnable = function()
 API.prototype.setObjectInfoViewEnable = function(objectInfoViewEnable) 
 {
 	this.objectInfoViewEnable = objectInfoViewEnable;
+};
+API.prototype.getOcclusionCullingEnable = function() 
+{
+	return this.occlusionCullingEnable;
+};
+API.prototype.setOcclusionCullingEnable = function(occlusionCullingEnable) 
+{
+	this.occlusionCullingEnable = occlusionCullingEnable;
 };
 API.prototype.getNearGeoIssueListEnable = function() 
 {
@@ -347,37 +352,53 @@ API.prototype.setDrawType = function(drawType)
 	this.drawType = drawType;
 };
 
-API.prototype.getLod0 = function() 
+API.prototype.getLod0DistInMeters = function() 
 {
-	return this.lod0;
+	return this.lod0DistInMeters;
 };
-API.prototype.setLod0 = function(lod0) 
+API.prototype.setLod0DistInMeters = function(lod0DistInMeters) 
 {
-	this.lod0 = lod0;
+	this.lod0DistInMeters = lod0DistInMeters;
 };
-API.prototype.getLod1 = function() 
+API.prototype.getLod1DistInMeters = function() 
 {
-	return this.lod1;
+	return this.lod1DistInMeters;
 };
-API.prototype.setLod1 = function(lod1) 
+API.prototype.setLod1DistInMeters = function(lod1DistInMeters) 
 {
-	this.lod1 = lod1;
+	this.lod1DistInMeters = lod1DistInMeters;
 };
-API.prototype.getLod2 = function() 
+API.prototype.getLod2DistInMeters = function() 
 {
-	return this.lod2;
+	return this.lod2DistInMeters;
 };
-API.prototype.setLod2 = function(lod2) 
+API.prototype.setLod2DistInMeters = function(lod2DistInMeters) 
 {
-	this.lod2 = lod2;
+	this.lod2DistInMeters = lod2DistInMeters;
 };
-API.prototype.getLod3 = function() 
+API.prototype.getLod3DistInMeters = function() 
 {
-	return this.lod3;
+	return this.lod3DistInMeters;
 };
-API.prototype.setLod3 = function(lod3) 
+API.prototype.setLod3DistInMeters = function(lod3DistInMeters) 
 {
-	this.lod3 = lod3;
+	this.lod3DistInMeters = lod3DistInMeters;
+};
+API.prototype.getLod4DistInMeters = function() 
+{
+	return this.lod4DistInMeters;
+};
+API.prototype.setLod4DistInMeters = function(lod4DistInMeters) 
+{
+	this.lod4DistInMeters = lod4DistInMeters;
+};
+API.prototype.getLod5DistInMeters = function() 
+{
+	return this.lod5DistInMeters;
+};
+API.prototype.setLod5DistInMeters = function(lod5DistInMeters) 
+{
+	this.lod5DistInMeters = lod5DistInMeters;
 };
 
 API.prototype.getAmbientReflectionCoef = function() 
@@ -427,4 +448,21 @@ API.prototype.getSsaoRadius = function()
 API.prototype.setSsaoRadius = function(ssaoRadius) 
 {
 	this.ssaoRadius = ssaoRadius;
+};
+API.prototype.getFPVMode = function()
+{
+	return this.FPVMode;
+};
+API.prototype.setFPVMode = function(value)
+{
+	this.FPVMode = value;
+};
+
+API.prototype.getDuration = function()
+{
+	return this.duration;
+};
+API.prototype.setDuration = function(duration)
+{
+	this.duration = duration;
 };
