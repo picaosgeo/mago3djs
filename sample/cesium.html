@@ -151,13 +151,13 @@
 			</tr>
 			<tr style="height: 35px;">
 				<td>
-				<label for="search_value">Search Word</label></td>
+				<label for="search_value">SearchWord</label></td>
 				<td><input type="text" id="search_value" name="search_value" size="31" /></td>
 			</tr>
 			<tr style="height: 35px;">
 				<td><label for="start_date">Date</label></td>
 				<td><input type="text" class="s date" id="start_date" name="start_date" size="12" />
-				<span class="delimeter tilde">~</span>
+				<span class="delimiter tilde">~</span>
 				<input type="text" class="s date" id="end_date" name="end_date" size="12" /></td>
 			</tr>
 			<tr style="height: 30px;">
@@ -607,7 +607,7 @@
 </div>
 
 <ul class="shortcut">
-	<li onclick="gotoProject('3ds.json', '126.60856869381428', '37.58210', '570', '3')">3DS Project</li>
+	<li onclick="gotoProject('3ds.json', '126.6113', '37.58210', '570', '3')">3DS Project</li>
 	<li onclick="gotoProject('ifc_cultural_assets.json', '126.97772995695296', '37.57981', '80', '3')">IFC(Cultural Assets)</li>
 	<li onclick="gotoProject('ifc.json', '-58.787', '-62.2237', '270', '5')">IFC</li>
 	<li onclick="gotoProject('ifc_mep.json', '126.738234', '37.6636', '150', '3')">IFC(MEP)</li>
@@ -680,7 +680,7 @@
 <script type="text/javascript" src="/src/mago3d/f4d/BlockModels.js"></script>
 <script type="text/javascript" src="/src/mago3d/f4d/HierarchyManager.js"></script>
 <script type="text/javascript" src="/src/mago3d/f4d/Lego.js"></script>
-<script type="text/javascript" src="/src/mago3d/f4d/LodBuilding.js"></script>
+<script type="text/javascript" src="/src/mago3d/f4d/LodBuildingData.js"></script>
 <script type="text/javascript" src="/src/mago3d/f4d/MetaData.js"></script>
 <script type="text/javascript" src="/src/mago3d/f4d/ModelReferencedGroup.js"></script>
 <script type="text/javascript" src="/src/mago3d/f4d/NeoBuilding.js"></script>
@@ -726,15 +726,8 @@
 	}
 
 	var managerFactory = null;
-	var menuMap = new Map();
-	menuMap.set("homeMenu", false);
-	menuMap.set("myIssueMenu", false);
-	menuMap.set("searchMenu", false);
-	menuMap.set("apiMenu", false);
-	menuMap.set("insertIssueMenu", false);
-	menuMap.set("configMenu", false);
+	var menuObject = { homeMenu : false, myIssueMenu : false, searchMenu : false, apiMenu : false, insertIssueMenu : false, configMenu : false };
 	var insertIssueEnable = false;
-	var FPVModeFlag = false;
 
 	var imagePath = "/images/ko";
 	var dataInformationUrl = "/sample/persistence/json/";
@@ -749,7 +742,7 @@
 			// Label 표시
 			changeLabel(false);
 			// object 정보 표시
-			changeObjectInfoViewMode(false);
+			changeObjectInfoViewMode(true);
 			// BoundingBox
 			changeBoundingBox(false);
 			// Selecting And Moving
@@ -1034,10 +1027,11 @@
 		menuSlideControl("configMenu");
 	});
 	function menuSlideControl(menuName) {
-		var compareMenuState = menuMap.get(menuName);
-		for(var [key, value] of menuMap) {
-			// state 값 변경하고, css 변경
+		var compareMenuState = menuObject[menuName];
+		for(var key in menuObject) {
+		    // state 값 변경하고, css 변경
 			if(key === menuName) {
+			    var value = menuObject[key];
 				if(value) {
 					$("#" + menuName).removeClass("on");
 					$("#menuContent").hide();
@@ -1047,7 +1041,7 @@
 					$("#menuContent").show();
 					$("#" + menuName + "Content").show();
 				}
-				menuMap.set(menuName, !compareMenuState);
+				menuObject[menuName] = !compareMenuState;
 			} else {
 				$("#" + key).removeClass("on");
 				$("#" + key + "Content").hide();
@@ -1057,12 +1051,13 @@
 	
 	// menu content close 버튼
 	$("#menuContentClose").click(function() {
-		for(var [key, value] of menuMap) {
+        for(var key in menuObject) {
+            var value = menuObject[key];
 			if(value) {
 				$("#menuContent").hide();
 				$("#" + key + "Content").hide();
 				$("#" + key).removeClass("on");
-				menuMap.set(key, !value);
+				menuObject[key] = !value;
 			}
 		}
 		// 이슈 등록 비활성화 상태
@@ -1265,7 +1260,7 @@
 		alert("This service is available only in Enterprise Version.");
 		return;
     });
-	
+
 	// 인접 지역 이슈 표시
 	function changeNearGeoIssueList(isShow) {
 		$("input:radio[name='nearGeoIssueList']:radio[value='" + isShow + "']").prop("checked", true);
@@ -1285,7 +1280,7 @@
 						if(issueList != null && issueList.length > 0) {
 							for(i=0; i<issueList.length; i++ ) {
 								var issue = issueList[i];
-								drawInsertIssueImageAPI(managerFactory, 0, issue.issue_id, issue.issue_type, issue.data_key, issue.latitude, issue.longitude, issue.height);
+								drawInsertIssueImageAPI(managerFactory, "0", issue.issue_id, issue.issue_type, issue.data_key, issue.latitude, issue.longitude, issue.height);
 							}
 						}
 					} else {
@@ -1432,7 +1427,7 @@
 		$("#positionLongitude").val(position.lon);
 		$("#positionAltitude").val(position.alt);
 	}
-	
+
 	// general callback alert function
 	function showApiResult(apiName, result) {
 		if(apiName === "searchData") {

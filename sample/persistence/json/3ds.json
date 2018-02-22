@@ -312,7 +312,7 @@
 			"data_key": "Simincheong_del",
 			"data_name": "Simincheong_del",
 			"heading": 0,
-			"height": 40,
+			"height": 60,
 			"latitude": 37.58035,
 			"longitude": 126.6164,
 			"pitch": 90,
@@ -325,14 +325,14 @@
 				"flipYTexCoords": true
 			},
 			"children": [],
-			"data_key": "k11_0163",
-			"data_name": "k11_0163",
-			"heading": 0,
-			"height": 55,
-			"latitude": 37.5808,
-			"longitude": 126.614,
-			"pitch": 0,
-			"roll": 0
+			"data_key": "Edumuseum_del_150417_02",
+			"data_name": "Edumuseum_del_150417_02",
+			"heading": 0.0,
+			"height": 40,
+			"latitude": 37.5799,
+			"longitude": 126.6105,
+			"pitch": 90.0,
+			"roll": 0.0
 		},
 		{
 			"attributes": {

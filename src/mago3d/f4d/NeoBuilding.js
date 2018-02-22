@@ -45,11 +45,10 @@ var NeoBuilding = function()
 	// The simple building.***********************************************
 	this.simpleBuilding3x3Texture; // old version.***
 	
-	// In version 001, there are 5 lods.***
-	// actually oldMeshes are lego object.***
-	this.availableLodMeshesArray;
-	this.availableLodTexturesArray;
-	this.lodMeshesArray; // here stores lod3mesh, lod4mesh and lod5mesh.***
+	// In version 001, there are 6 lods.***
+	this.lodMeshesMap;
+	this.lodBuildingDatasArray;
+	
 	
 	// Render settings.***************************************************
 	// provisionally put this here.
@@ -76,7 +75,7 @@ NeoBuilding.prototype.getReferenceObjectsArrayByObjectId = function(objectId)
 	if (this.motherNeoReferencesMap === undefined)
 	{ return undefined; }
 
-	var refObject = this.motherNeoReferencesMap.get(objectId);
+	var refObject = this.motherNeoReferencesMap[objectId];
 	return refObject;
 };
 
@@ -94,15 +93,15 @@ NeoBuilding.prototype.putReferenceObject = function(refObject, refObjectIdx)
 	
 	// Additionally, make a objects map.
 	if (this.motherNeoReferencesMap === undefined)
-	{ this.motherNeoReferencesMap = new Map(); }
+	{ this.motherNeoReferencesMap = {}; }
 	
-	var objectsArray = this.motherNeoReferencesMap.get(refObject.objectId);
+	var objectsArray = this.motherNeoReferencesMap[refObject.objectId];
 	if (objectsArray === undefined)
 	{ objectsArray = []; }
 	
 	objectsArray.push(refObject);
 	
-	this.motherNeoReferencesMap.set(refObject.objectId, objectsArray);
+	this.motherNeoReferencesMap[refObject.objectId] = objectsArray;
 };
 
 /**
@@ -133,7 +132,7 @@ NeoBuilding.prototype.deleteObjectsModelReferences = function(gl, vboMemoryManag
 	// 1rst, clear this.motherNeoReferencesMap.
 	if (this.motherNeoReferencesMap)
 	{ 
-		this.motherNeoReferencesMap.clear(); 
+		this.motherNeoReferencesMap = {}; 
 		this.motherNeoReferencesMap = undefined;
 	}
 	
@@ -198,20 +197,16 @@ NeoBuilding.prototype.deleteObjects = function(gl, vboMemoryManager)
 	this.texturesLoaded = undefined;
 	
 	// delete lod3, lod4, lod5.***
-	if (this.lodMeshesArray)
+	if(this.lodMeshesMap !== undefined)
 	{
-		var lodMeshesCount = this.lodMeshesArray.length;
-		for (var i=0; i<lodMeshesCount; i++)
+		for(var key in this.lodMeshesMap)
 		{
-			if (this.lodMeshesArray[i])
-			{
-				this.lodMeshesArray[i].deleteObjects(gl, vboMemoryManager);
-				this.lodMeshesArray[i] = undefined;
-			}
+			var legoSkin = this.lodMeshesMap[key];
+			legoSkin.deleteObjects(gl, vboMemoryManager)
+			legoSkin = undefined;
 		}
-		this.lodMeshesArray.length = 0;
+		this.lodMeshesMap = undefined;
 	}
-	this.lodMeshesArray = undefined;
 };
 
 /**
@@ -379,16 +374,98 @@ NeoBuilding.prototype.getHeaderVersion = function()
 	return this.metaData.version;
 };
 
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param lod 변수
+ */
+NeoBuilding.prototype.getLodBuildingData = function(lod) 
+{
+	var resultLodBuildingData = undefined;
+	var find = false;
+	
+	if(this.lodBuildingDatasArray === undefined)
+		return;
+	
+	var lodBuildingDatasCount = this.lodBuildingDatasArray.length;
+	var i = 0;
+	while(!find && i<lodBuildingDatasCount)
+	{
+		if(this.lodBuildingDatasArray[i].lod === lod)
+		{
+			find = true;
+			resultLodBuildingData = this.lodBuildingDatasArray[i];
+		}
+		i++;
+	}
+	return resultLodBuildingData;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @param neoReference 변수
+ */
+NeoBuilding.prototype.getCurrentLodString = function() 
+{
+	var currentLodString = undefined;
+	var lodBuildingData = this.getLodBuildingData(this.currentLod);
+	currentLodString = lodBuildingData.geometryFileName;
+	return currentLodString;
+};
+
 /**
  * 어떤 일을 하고 있습니까?
  * @param neoReference 변수
  */
 NeoBuilding.prototype.getCurrentSkin = function() 
 {
-	if (this.lodMeshesArray === undefined)
+	if (this.lodMeshesMap === undefined)
 	{ return undefined; }
 	
 	var skinLego;
+	if (this.currentLod === 3)
+	{
+		skinLego = this.lodMeshesMap["lod3"];
+		
+		if (skinLego === undefined || !skinLego.isReadyToRender())
+		{
+			skinLego = this.lodMeshesMap["lod4"];
+			if (skinLego === undefined || !skinLego.isReadyToRender())
+			{
+				skinLego = this.lodMeshesMap["lod5"];
+			}
+		}
+		
+	}
+	else if (this.currentLod === 4)
+	{
+		skinLego = this.lodMeshesMap["lod4"];
+		
+		if (skinLego === undefined || !skinLego.isReadyToRender())
+		{
+			skinLego = this.lodMeshesMap["lod5"];
+			if (skinLego === undefined || !skinLego.isReadyToRender())
+			{
+				skinLego = this.lodMeshesMap["lod3"];
+			}
+		}
+		
+	}
+	else if (this.currentLod === 5)
+	{
+		skinLego = this.lodMeshesMap["lod5"];
+		
+		if (skinLego === undefined || !skinLego.isReadyToRender())
+		{
+			skinLego = this.lodMeshesMap["lod4"];
+			if (skinLego === undefined || !skinLego.isReadyToRender())
+			{
+				skinLego = this.lodMeshesMap["lod3"];
+			}
+		}
+		
+	}
+	/*
 	if (this.currentLod === 3)
 	{
 		skinLego = this.lodMeshesArray[0];
@@ -425,7 +502,7 @@ NeoBuilding.prototype.getCurrentSkin = function()
 			}
 		}
 	}
-	
+	*/
 	return skinLego;
 };
 
