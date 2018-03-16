@@ -1409,6 +1409,12 @@ MagoManager.prototype.prepareVisibleLowLodNodes = function(lowLodNodesArray)
 			neoBuilding.lodMeshesMap[lodString] = lowLodMesh;
 		}
 		
+		if (lowLodMesh.fileLoadState === -1)
+		{
+			// if a lodObject has "fileLoadState" = -1 means that there are no file in server.***
+			continue;
+		}
+		
 		if (lowLodMesh.fileLoadState === CODE.fileLoadState.READY) 
 		{
 			// load lodMesh.***
@@ -2327,6 +2333,33 @@ MagoManager.prototype.manageMouseDragging = function(mouseX, mouseY)
 				}
 				this.mustCheckIfDragging = false;
 			}
+			// Display geoLocationData while moving building.***
+			var nodeOwner = this.buildingSelected.nodeOwner;
+			if(nodeOwner === undefined)
+				return;
+
+			var geoLocDataManager = nodeOwner.data.geoLocDataManager;
+			if(geoLocDataManager === undefined)
+				return;
+
+			var geoLocation = geoLocDataManager.getGeoLocationData(0);
+			if(geoLocation === undefined)
+				return;
+
+			var geographicCoords = geoLocation.geographicCoord;
+			if(geographicCoords === undefined)
+				return;
+			
+			movedDataCallback(	MagoConfig.getPolicy().geo_callback_moveddata,
+                				nodeOwner.data.nodeId,
+								null,
+								geographicCoords.latitude,
+								geographicCoords.longitude,
+								geographicCoords.altitude,
+								geoLocation.heading,
+								geoLocation.pitch,
+								geoLocation.roll);
+								
 		}
 		else 
 		{
@@ -6711,6 +6744,7 @@ MagoManager.prototype.calculateBoundingBoxesNodes = function()
 	for (var i=0; i<rootNodesCount; i++)
 	{
 		nodeRoot = rootNodesArray[i];
+		
 		nodesArray.length = 0; // init.***
 		nodeRoot.extractNodesByDataName(nodesArray, "buildingSeed");
 		// now, take nodes that is "isMain" = true.
@@ -6859,10 +6893,103 @@ MagoManager.prototype.callAPI = function(api)
 	}
 	else if (apiName === "deleteAllObjectMove") 
 	{
+		// delete "aditionalMove" of the objects.***
+		var moveHistoryMap = MagoConfig.getAllMovingHistory(); // get colorHistoryMap.***
+		if (moveHistoryMap === undefined)
+		{
+			MagoConfig.clearMovingHistory();
+			return;
+		}
+		
+		for (var key_projectId in moveHistoryMap)
+		{
+			var projectId = key_projectId;
+			var buildingsMap = moveHistoryMap[projectId];
+			if (buildingsMap === undefined)
+			{ continue; }
+			
+			for (var key_dataKey in buildingsMap)
+			{
+				var dataKey = key_dataKey;
+				var dataValue = buildingsMap[key_dataKey];
+				
+				if (dataValue === undefined)
+				{ continue; }
+				
+				for (var objectIdx in dataValue)
+				{
+					var node = this.hierarchyManager.getNodeByDataKey(projectId, dataKey);
+					if (node === undefined || node.data === undefined)
+					{ continue; }
+					
+					var neoBuilding = node.data.neoBuilding;
+					if (neoBuilding === undefined)
+					{ continue; }
+					
+					var refObject = neoBuilding.getReferenceObject(objectIdx);
+					if (refObject)
+					{
+						refObject.moveVector = undefined;
+						refObject.moveVectorRelToBuilding = undefined;
+					}
+				}
+			}
+		}
+		
 		MagoConfig.clearMovingHistory();
 	}
 	else if (apiName === "deleteAllChangeColor") 
 	{
+		// 1rst, must delete the aditionalColors of objects.***
+		var colorHistoryMap = MagoConfig.getAllColorHistory(); // get colorHistoryMap.***
+		
+		if (colorHistoryMap === undefined)
+		{
+			MagoConfig.clearColorHistory();
+			return;
+		}
+		
+		for (var key_projectId in colorHistoryMap)
+		{
+			var projectId = key_projectId;
+			var buildingsMap = colorHistoryMap[projectId];
+			if (buildingsMap === undefined)
+			{ continue; }
+			
+			for (var key_dataKey in buildingsMap)
+			{
+				var dataKey = key_dataKey;
+				var dataValue = buildingsMap[key_dataKey];
+				if (dataValue === undefined)
+				{ continue; }
+				
+				for (var objectId in dataValue)
+				{
+					var node = this.hierarchyManager.getNodeByDataKey(projectId, dataKey);
+					if (node === undefined || node.data === undefined)
+					{ continue; }
+					
+					var neoBuilding = node.data.neoBuilding;
+					if (neoBuilding === undefined)
+					{ continue; }
+					
+					var refObjectArray = neoBuilding.getReferenceObjectsArrayByObjectId(objectId);
+					if (refObjectArray === undefined)
+					{ continue; }
+					
+					var refObjectsCount = refObjectArray.length;
+					for (var i=0; i<refObjectsCount; i++)
+					{
+						var refObject = refObjectArray[i];
+						if (refObject)
+						{
+							refObject.aditionalColor = undefined;
+						}
+					}
+				}
+			}
+		}
+		
 		MagoConfig.clearColorHistory();
 	}
 	else if (apiName === "changeInsertIssueMode") 
@@ -7004,14 +7131,69 @@ MagoManager.prototype.callAPI = function(api)
 	{
 		this.deleteAll();
 	}
+	else if (apiName === "getDataInfoByDataKey")
+	{
+		var projectId = api.getProjectId(); // for example : 3ds, collada, ifc, etc.***
+		var dataKey = api.getDataKey();
+		
+		var node = this.hierarchyManager.getNodeByDataKey(projectId, dataKey);
+		
+		if (node === undefined)
+		{
+			apiResultCallback( MagoConfig.getPolicy().geo_callback_apiresult, apiName, "-1");
+			return;
+		}
+		
+		var dataName = node.data.data_name;
+		var geoLocDataManager = node.data.geoLocDataManager;
+		
+		if (dataName === undefined || geoLocDataManager === undefined)
+		{
+			apiResultCallback( MagoConfig.getPolicy().geo_callback_apiresult, apiName, "-1");
+			return;
+		}
+		
+		var geoLocdata = geoLocDataManager.getCurrentGeoLocationData();
+		
+		if (geoLocdata === undefined || geoLocdata.geographicCoord === undefined)
+		{
+			apiResultCallback( MagoConfig.getPolicy().geo_callback_apiresult, apiName, "-1");
+			return;
+		}
+		
+		var latitude = geoLocdata.geographicCoord.latitude;
+		var longitude = geoLocdata.geographicCoord.longitude;
+		var altitude = geoLocdata.geographicCoord.altitude;
+		var heading = geoLocdata.heading;
+		var pitch = geoLocdata.pitch;
+		var roll = geoLocdata.roll;
+		
+		dataInfoCallback(		MagoConfig.getPolicy().geo_callback_dataInfo,
+			dataKey,
+			dataName,
+			latitude,
+			longitude,
+			altitude,
+			heading,
+			pitch,
+			roll);
+	}
 	else if (apiName === "gotoProject")
 	{
 		var projectId = api.getProjectId();
-		if (!this.hierarchyManager.existProject(projectId))
+		//if (!this.hierarchyManager.existProject(projectId))
+		//{
+		//	var projectDataFolder = api.getProjectDataFolder();
+		//	this.getObjectIndexFile(projectId, projectDataFolder);
+		//}
+		
+		var nodeMap = this.hierarchyManager.getNodesMap(projectId);
+		if (Object.keys(nodeMap).length == 0)
 		{
 			var projectDataFolder = api.getProjectDataFolder();
 			this.getObjectIndexFile(projectId, projectDataFolder);
 		}
+		
 		
 		this.flyTo(api.getLongitude(), api.getLatitude(), api.getElevation(), api.getDuration());
 	}
@@ -7071,7 +7253,7 @@ MagoManager.prototype.checkCollision = function (position, direction)
 	var posX = this.sceneState.drawingBufferWidth * 0.5;
 	var posY = this.sceneState.drawingBufferHeight * 0.5;
 	
-	var objects = this.getSelectedObjects(gl, posX, posY, this.visibleObjControlerBuildings, this.arrayAuxSC);
+	var objects = this.getSelectedObjects(gl, posX, posY, this.visibleObjControlerNodes, this.arrayAuxSC);
 	if (objects === undefined)	{ return; }
 
 	var current_building = this.buildingSelected;

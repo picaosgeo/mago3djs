@@ -50,6 +50,7 @@ HierarchyManager.prototype.deleteNodes = function(gl, vboMemoryManager)
  */
 HierarchyManager.prototype.getNodeByDataName = function(projectId, dataName, dataNameValue) 
 {
+	// note: here "dataName" refers "nodeId", or other datas that can be inside of"data".***
 	var nodesMap = this.getNodesMap(projectId);
 	
 	if (nodesMap === undefined)
@@ -76,6 +77,23 @@ HierarchyManager.prototype.getNodeByDataName = function(projectId, dataName, dat
  * @class GeoLocationData
  * @param geoLocData 변수
  */
+HierarchyManager.prototype.getNodeByDataKey = function(projectId, dataKey) 
+{
+	var nodesMap = this.getNodesMap(projectId);
+	
+	if (nodesMap === undefined)
+	{ return undefined; }
+	
+	var resultNode = nodesMap[dataKey];
+	
+	return resultNode;
+};
+
+/**
+ * 어떤 일을 하고 있습니까?
+ * @class GeoLocationData
+ * @param geoLocData 변수
+ */
 HierarchyManager.prototype.getRootNodes = function(resultRootNodesArray) 
 {
 	if (resultRootNodesArray === undefined)
@@ -86,11 +104,11 @@ HierarchyManager.prototype.getRootNodes = function(resultRootNodesArray)
 	for (var i=0; i<nodesCount; i++)
 	{
 		node = this.nodesArray[i];
+		
 		if (node.parent === undefined)
 		{
 			resultRootNodesArray.push(node);
 		}
-		i++;
 	}
 	
 	return resultRootNodesArray;
